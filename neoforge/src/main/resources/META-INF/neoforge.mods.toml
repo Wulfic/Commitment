@@ -1,0 +1,27 @@
+modLoader = "javafml"
+loaderVersion = "[1,)"
+license = "MIT"
+
+[[mods]]
+modId = "commitment"
+version = "${version}"
+displayName = "Commitment"
+authors = "wulfic"
+logoFile = "assets/commitment/icon.png"
+description = '''
+Commit a world to the mods, resource packs and config it was played with. Changing them later takes a 24-hour unlock.
+'''
+
+[[dependencies.commitment]]
+modId = "neoforge"
+type = "required"
+versionRange = "[${neoforgeVersion},)"
+ordering = "NONE"
+side = "BOTH"
+
+[[dependencies.commitment]]
+modId = "minecraft"
+type = "required"
+versionRange = "${minecraftRange}"
+ordering = "NONE"
+side = "BOTH"

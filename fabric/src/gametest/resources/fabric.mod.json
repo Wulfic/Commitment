@@ -1,0 +1,18 @@
+{
+	"schemaVersion": 1,
+	"id": "commitment-gametest",
+	"version": "${version}",
+	"name": "Commitment: game tests",
+	"environment": "*",
+	"entrypoints": {
+		"fabric-gametest": [
+			"com.wulfic.commitment.gametest.CommitmentGameTest"
+		],
+		"fabric-client-gametest": [
+			"com.wulfic.commitment.gametest.CommitmentClientGameTest"
+		]
+	},
+	"depends": {
+		"commitment": "*"
+	}
+}

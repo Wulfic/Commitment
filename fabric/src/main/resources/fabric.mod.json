@@ -1,0 +1,24 @@
+{
+	"schemaVersion": 1,
+	"id": "commitment",
+	"version": "${version}",
+	"name": "Commitment",
+	"description": "Commit a world to the mods, resource packs and config it was played with. Changing them later takes a 24-hour unlock.",
+	"authors": [
+		"wulfic"
+	],
+	"license": "MIT",
+	"icon": "assets/commitment/icon.png",
+	"environment": "*",
+	"entrypoints": {
+		"main": [
+			"com.wulfic.commitment.CommitmentFabric"
+		]
+	},
+	"depends": {
+		"fabricloader": ">=0.19.5",
+		"minecraft": "${minecraftRange}",
+		"java": ">=25",
+		"fabric-api": "*"
+	}
+}

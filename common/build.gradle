@@ -1,0 +1,68 @@
+plugins {
+	id 'net.fabricmc.fabric-loom'
+}
+
+// Everything that doesn't touch a loader: the manifest, the lock record, the guard pack, the timer and every
+// resource. LoaderFreeTest fails on any loader API import. Each loader project compiles these sources
+// into its own jar, so common hands out its source directories (the MultiLoader-Template pattern).
+// Every branch names its nodes after the band, so the branch goes in the group to keep `:common:26.2` and
+// `:fabric:26.2` distinct modules. Otherwise Gradle resolves a dependency on one to the other.
+group = "${project.group}.common"
+
+configurations {
+	commonJava {
+		canBeResolved = false
+		canBeConsumed = true
+	}
+	commonResources {
+		canBeResolved = false
+		canBeConsumed = true
+	}
+}
+
+// A node's sources are its own versions/<band>/src overlay plus either src/ itself (the active band) or the
+// copy Stonecutter generates with this band's `//? if` blocks switched on.
+sourceSets.main.java.srcDirs.each { dir ->
+	artifacts.add('commonJava', dir) { builtBy tasks.named('stonecutterGenerate') }
+}
+sourceSets.main.resources.srcDirs.each { dir ->
+	artifacts.add('commonResources', dir) { builtBy tasks.named('stonecutterGenerate') }
+}
+
+loom {
+	// No entrypoint to run: the loader projects own the run configs.
+	runs.clear()
+}
+
+dependencies {
+	// The node's band is the Minecraft version. The other pins are in gradle.properties.
+	minecraft "com.mojang:minecraft:${stonecutter.current.version}"
+
+	// Only for the tests: fabric-loader-junit needs the loader's own libraries (ASM, Mixin), which Loom adds
+	// for a loader dependency. LoaderFreeTest keeps loader APIs out of the sources.
+	implementation "net.fabricmc:fabric-loader:${project.loader_version}"
+
+	testImplementation platform("org.junit:junit-bom:${project.junit_version}")
+	// Boots Minecraft's registries inside JUnit, for tests that need them.
+	testImplementation "net.fabricmc:fabric-loader-junit:${project.loader_version}"
+	testImplementation "org.junit.jupiter:junit-jupiter"
+	testRuntimeOnly "org.junit.platform:junit-platform-launcher"
+}
+
+tasks.withType(JavaCompile).configureEach {
+	it.options.release = 25
+}
+
+java {
+	sourceCompatibility = JavaVersion.VERSION_25
+	targetCompatibility = JavaVersion.VERSION_25
+}
+
+test {
+	useJUnitPlatform()
+	systemProperty "commitment.commonSources", sourceSets.main.java.srcDirs.collect { it.absolutePath }.join(File.pathSeparator)
+	testLogging {
+		events = ["passed", "skipped", "failed"]
+		exceptionFormat = "full"
+	}
+}

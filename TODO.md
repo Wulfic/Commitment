@@ -250,18 +250,35 @@ place. Clock tests use the injected clock.
 
 ### Stage A: scaffold (copy `../the-continent`, commit when green)
 
-- [ ] A.1 `settings.gradle`, `stonecutter.gradle`, `gradle.properties`: branches `common`,
+- [x] A.1 `settings.gradle`, `stonecutter.gradle`, `gradle.properties`: branches `common`,
       `fabric`, `neoforge`, `forge` × the nodes from 0.1, pins from 0.1 with dates, mod id
       `commitment`, package `com.wulfic.commitment`.
-- [ ] A.2 One entrypoint per loader logging `Commitment <ver> loaded on <loader> <mc>`. Dev
+- [x] A.2 One entrypoint per loader logging `Commitment <ver> loaded on <loader> <mc>`. Dev
       server per `dev-server` Part A: its own unused port (check `netstat` and record it in
       `state.md`), `run/` dirs, EULA task, `scripts/dev-server-smoke.sh` from `../enchanting-2`,
       and a real-server smoke tool from `../the-continent/tools/server_smoke.py` (needed for
       Proof 4 and 7).
-- [ ] A.3 Tests: no loader imports in common (the scan test), `ReadmeBandsTest`, an empty Fabric
+      **Done so far:** port **25571** (`dev_server_port`; 25565–25567, 25575, 25577 and 25599 are other
+      repos'), run dirs `run/<loader>/<band>/{server,client}`, `acceptDevServerEula` on every loader.
+      `scripts/dev-server-smoke.sh` is written to the `dev-server` Part A contract, with `LOADER`/`NODE`
+      and `--self-test` (9 cases, both polarities). Mutation-checked: with the `\[ERROR\]` regex, "an
+      ERROR from Commitment fails" goes red. `server_smoke.py` is deferred to Stage C (Proof 4 and 7
+      need it; Stage A doesn't).
+- [x] A.3 Tests: no loader imports in common (the scan test), `ReadmeBandsTest`, an empty Fabric
       client GameTest that creates and joins a new world. The README's band statement.
-- [ ] A.4 Every node builds, with test counts read from the log. `scripts/checks/boot.txt` smoke
+- [x] A.4 Every node builds, with test counts read from the log. `scripts/checks/boot.txt` smoke
       (`@expect Commitment .* loaded`) on each loader. Record here and commit.
+      **Runs, 2026-10-21:** `./gradlew build` exit 0 on all 12 nodes. JUnit counts read from the XML:
+      common 2 tests per node, fabric 10 per node, 0 failed, 0 skipped. `runGameTest`: "All 2 required
+      tests passed" on all three Fabric nodes. Ours is `commitment-gametest:commitment_game_test_mod_is_loaded_on_the_server`
+      (mutation: inverted, it fails with "1 required tests failed"); the other one in the batch isn't ours.
+      `LOADER=<l> NODE=<n> scripts/dev-server-smoke.sh scripts/checks/boot.txt`: **exit 0 on all 9**
+      (fabric/neoforge/forge × 26.1.2/26.2/26.3), matching `Commitment 0.1.0 loaded on <Fabric 0.19.5 |
+      NeoForge 26.1.2.122/26.2.0.93/26.3.0.95 | Forge 64.1.5/65.1.5/66.1.0>, Minecraft <node>` and
+      `There are 0 of a max of 20 players online`. Rung 5: `:fabric:<node>:runClientGameTest` exit 0
+      with `Commitment client world check: PASS` on 26.1.2, 26.2 and 26.3. Two fixes on the way
+      (gotchas.md 2026-10-21): NeoForge's console needed `standardInput`, and Forge's dev run needed
+      classes and resources in one dir. Quilt and the real-server smoke wait for Stage C (`server_smoke.py`).
 
 ### Stage B: core in `common`, pure Java, JUnit first (commit per step)
 
@@ -270,6 +287,18 @@ place. Clock tests use the injected clock.
       list and the ignore list. Tests: add, remove and change one item of each kind → exactly that
       diff; a reordered json → no diff; a change to render distance, volume, a shader pack or
       `sodium-options.json` → no diff; Commitment's own jar left out.
+      **Data model (written before code, 2026-10-21):** a `Manifest` is a sorted map of entry key →
+      fingerprint, so the diff is a plain map compare and its order is stable. Keys: `minecraft`
+      (version), `loader` (`<name> <version>`), `mod/<id>` (`<version>`, plus `sha256:<hash>` of the
+      mod's own jar when it has one; nested and built-in mods get the version only),
+      `config/<relpath>` and `defaultconfigs/<relpath>` (hash of the normalized content),
+      `options/resourcePacks` and `options/incompatibleResourcePacks` (the raw values, so the order
+      counts), `resourcepack/<name>` (content hash of each enabled `file/` pack, file or folder), and
+      `datapack/<name>` (each world datapack except the guard). A folder hashes as its sorted
+      (relative path, content) pairs. Normalization: json → parsed and re-written with sorted keys;
+      `.properties` → sorted `key=value`; toml/cfg/txt → comments, blank lines and trailing
+      whitespace dropped (no TOML parser on Fabric's classpath; a key reorder in toml still counts as
+      a change, and Stage E will show whether that matters). Paths use `/` on every OS.
 - [ ] B.2 `ManifestDiff` → readable lines, capped. Test the cap and the order.
 - [ ] B.3 `LockRecord` (NBT, HMAC-signed) + `LockStore`: world record, OS mirror, and the
       reconciliation rules (one valid copy restores the rest; tampered or missing while the guard

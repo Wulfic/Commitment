@@ -1,0 +1,116 @@
+plugins {
+	id 'net.neoforged.moddev'
+}
+
+// This node's Minecraft band, and common's node for it.
+def band = stonecutter.current.version
+def common = ":common:${stonecutter.current.project}"
+
+// Keeps `:neoforge:26.2` a different module from `:common:26.2` (see common/build.gradle).
+group = "${project.group}.neoforge"
+
+// commitment-<version>+neoforge-mc<band label>.jar, and the matching sources jar.
+base {
+	archivesName = rootProject.name
+}
+def jarVersion = "${project.version}+neoforge-mc${project.property("neoforge_band_label.$band")}"
+tasks.withType(AbstractArchiveTask).configureEach {
+	archiveVersion = jarVersion
+}
+
+// common's sources and resources are compiled into this jar (see common/build.gradle), as for Fabric.
+configurations {
+	commonJava {
+		canBeResolved = true
+		canBeConsumed = false
+	}
+	commonResources {
+		canBeResolved = true
+		canBeConsumed = false
+	}
+}
+
+// One run root per loader and band (see fabric/build.gradle).
+def runRoot = rootProject.file("run/neoforge/${band}")
+
+neoForge {
+	version = project.property("neoforge_version.$band")
+	runs {
+		client {
+			client()
+			gameDirectory = new File(runRoot, "client")
+		}
+		server {
+			server()
+			gameDirectory = new File(runRoot, "server")
+			programArguments.addAll '--nogui', '--port', project.dev_server_port
+		}
+	}
+	mods {
+		"commitment" {
+			sourceSet sourceSets.main
+		}
+	}
+}
+
+// The dev server refuses to start without eula.txt. Written only when absent: never overwrites a file someone set.
+def serverEula = new File(runRoot, "server/eula.txt")
+def acceptDevServerEula = tasks.register('acceptDevServerEula') {
+	doLast {
+		if (!serverEula.exists()) {
+			serverEula.parentFile.mkdirs()
+			serverEula.text = "eula=true\n"
+			logger.lifecycle("Wrote ${serverEula} for the dev server")
+		}
+	}
+}
+tasks.named('runServer', JavaExec) {
+	dependsOn acceptDevServerEula
+	// MDG doesn't hand the console to the server: without this, scripts/dev-server-smoke.sh types its commands and
+	// `stop` into nothing, and the server runs until the timeout.
+	standardInput = System.in
+}
+
+dependencies {
+	// common's node for the same band. Compiled classes for IDEs only: the build compiles its sources, below.
+	compileOnly project(common)
+	commonJava project(path: common, configuration: 'commonJava')
+	commonResources project(path: common, configuration: 'commonResources')
+}
+
+tasks.named('compileJava', JavaCompile) {
+	dependsOn configurations.commonJava
+	source configurations.commonJava
+}
+
+processResources {
+	def properties = [
+			version        : project.version,
+			minecraftRange : project.property("neoforge_minecraft_range.$band"),
+			neoforgeVersion: project.property("neoforge_version.$band"),
+	]
+	inputs.properties properties
+
+	from configurations.commonResources
+
+	filesMatching("META-INF/neoforge.mods.toml") {
+		expand properties
+	}
+}
+
+tasks.withType(JavaCompile).configureEach {
+	it.options.release = 25
+}
+
+java {
+	withSourcesJar()
+
+	sourceCompatibility = JavaVersion.VERSION_25
+	targetCompatibility = JavaVersion.VERSION_25
+}
+
+tasks.named('sourcesJar', Jar) {
+	dependsOn configurations.commonJava, configurations.commonResources
+	from configurations.commonJava
+	from configurations.commonResources
+}

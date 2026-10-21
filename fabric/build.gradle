@@ -1,0 +1,165 @@
+plugins {
+	id 'net.fabricmc.fabric-loom'
+}
+
+// This node's Minecraft band, and common's node for it.
+def band = stonecutter.current.version
+def common = ":common:${stonecutter.current.project}"
+
+// Keeps `:fabric:26.2` a different module from `:common:26.2` (see common/build.gradle).
+group = "${project.group}.fabric"
+
+// commitment-<version>+fabric-mc<band label>.jar, and the matching sources jar. The mod's own version in
+// fabric.mod.json stays plain.
+base {
+	archivesName = rootProject.name
+}
+def jarVersion = "${project.version}+fabric-mc${project.property("band_label.$band")}"
+tasks.withType(AbstractArchiveTask).configureEach {
+	archiveVersion = jarVersion
+}
+
+repositories {
+	// Loom adds the repositories for Minecraft, Fabric and their libraries automatically.
+	// Only add one here when depending on another mod.
+}
+
+// common's sources and resources are compiled into this jar (see common/build.gradle), so there is
+// one jar to ship.
+configurations {
+	commonJava {
+		canBeResolved = true
+		canBeConsumed = false
+	}
+	commonResources {
+		canBeResolved = true
+		canBeConsumed = false
+	}
+}
+
+// One run root per loader and band, so a newer Minecraft never upgrades another node's worlds, and the client's
+// saves never mix with the dev server's world. runDir is relative to the node's project dir.
+def runRoot = rootProject.file("run/fabric/${band}")
+
+loom {
+	mods {
+		"commitment" {
+			sourceSet sourceSets.main
+		}
+	}
+	runs {
+		client {
+			runDir project.relativePath(new File(runRoot, "client"))
+		}
+		server {
+			runDir project.relativePath(new File(runRoot, "server"))
+			programArgs '--port', project.dev_server_port
+		}
+	}
+}
+
+// The dev server refuses to start without eula.txt. Written only when absent: never overwrites a file someone set.
+def serverEula = new File(runRoot, "server/eula.txt")
+def acceptDevServerEula = tasks.register('acceptDevServerEula') {
+	doLast {
+		if (!serverEula.exists()) {
+			serverEula.parentFile.mkdirs()
+			serverEula.text = "eula=true\n"
+			logger.lifecycle("Wrote ${serverEula} for the dev server")
+		}
+	}
+}
+tasks.named('runServer') {
+	dependsOn acceptDevServerEula
+}
+
+fabricApi {
+	// Adds the `gametest` source set and `runGameTest`, which `check` runs on a headless server
+	// in fabric/build/run/gameTest. Loom wipes that directory before every run.
+	// `runClientGameTest` plays a singleplayer world on a real client. It needs a display, so
+	// `check` leaves it out.
+	configureTests {
+		createSourceSet = true
+		modId = "commitment-gametest"
+		enableGameTests = true
+		enableClientGameTests = true
+		eula = true // Accepts the Minecraft EULA for the automated test server only.
+	}
+}
+
+dependencies {
+	// The node's band is the Minecraft version; the rest is per band in gradle.properties.
+	minecraft "com.mojang:minecraft:${band}"
+	implementation "net.fabricmc:fabric-loader:${project.loader_version}"
+	implementation "net.fabricmc.fabric-api:fabric-api:${project.property("fabric_api_version.$band")}"
+
+	// common's node for the same band. Compiled classes for IDEs only: the build compiles its sources, below.
+	compileOnly project(common)
+	commonJava project(path: common, configuration: 'commonJava')
+	commonResources project(path: common, configuration: 'commonResources')
+
+	testImplementation platform("org.junit:junit-bom:${project.junit_version}")
+	testImplementation "net.fabricmc:fabric-loader-junit:${project.loader_version}"
+	testImplementation "org.junit.jupiter:junit-jupiter"
+	testRuntimeOnly "org.junit.platform:junit-platform-launcher"
+}
+
+tasks.named('compileJava', JavaCompile) {
+	dependsOn configurations.commonJava
+	source configurations.commonJava
+}
+
+processResources {
+	def version = project.version
+	def minecraftRange = project.property("minecraft_range.$band")
+	inputs.property "version", version
+	inputs.property "minecraftRange", minecraftRange
+
+	from configurations.commonResources
+
+	filesMatching("fabric.mod.json") {
+		expand "version": version, "minecraftRange": minecraftRange
+	}
+}
+
+// The game-test mod declares the same version; left as ${version}, Fabric Loader warns on every test run.
+tasks.named('processGametestResources', ProcessResources) {
+	def version = project.version
+	inputs.property "version", version
+	filesMatching("fabric.mod.json") {
+		expand "version": version
+	}
+}
+
+tasks.withType(JavaCompile).configureEach {
+	it.options.release = 25
+}
+
+java {
+	withSourcesJar()
+
+	sourceCompatibility = JavaVersion.VERSION_25
+	targetCompatibility = JavaVersion.VERSION_25
+}
+
+tasks.named('sourcesJar', Jar) {
+	dependsOn configurations.commonJava, configurations.commonResources
+	from configurations.commonJava
+	from configurations.commonResources
+}
+
+test {
+	useJUnitPlatform()
+	// ModMetadataTest reads the repo's LICENSE and ReadmeBandsTest its README and gradle.properties; Gradle runs
+	// tests from the node's folder, not the repo root. They're inputs, so editing one alone reruns the tests.
+	systemProperty "commitment.repoRoot", rootDir.absolutePath
+	inputs.files(rootProject.file("LICENSE"), rootProject.file("README.md"), rootProject.file("gradle.properties"))
+		.withPropertyName("repoDocs").withPathSensitivity(PathSensitivity.RELATIVE)
+	// BandLabelTest: the jar this node ships, and the Minecraft version it compiles against.
+	systemProperty "commitment.jarName", tasks.named('jar', Jar).get().archiveFileName.get()
+	systemProperty "commitment.minecraft", band
+	testLogging {
+		events = ["passed", "skipped", "failed"]
+		exceptionFormat = "full"
+	}
+}

@@ -104,3 +104,29 @@ skips `#load` and `#tick` while `tickRateManager().runsNormally()` is false, so 
 a pack that always fails). `/tick freeze` needs cheats, which is the same bar as `/datapack disable`.
 **Dead ends:** Reasoning about Safe Mode from memory. Decompile `MinecraftServer.getSelectedPacks` instead.
 **Affects:** TODO.md 0.2, the future guard pack and threat-model table
+
+## 2026-10-21 — Dev servers on NeoForge/Forge: no console input, and Forge's dev run splits the mod in two
+**Symptom:** `scripts/dev-server-smoke.sh` on NeoForge reached `Done (`, then ignored `list` and `stop` until the
+timeout (exit 124). On Forge, `runServer` exited 0 in 42 s with no server: `File …/build/resources/main constructed
+0 mods: [], but had 1 mods specified: [commitment]` (FATAL), crash report, `BUILD SUCCESSFUL`.
+**Cause:** MDG's `RunGameTask` is a `JavaExec` that doesn't set `standardInput`, so the console never sees the pipe
+(Loom's run tasks do). ForgeGradle 7 runs `build/classes` and `build/resources` as two mod files unless the run
+puts them in one directory: Forge loads a dev mod as a Java module, and a resources dir holding mods.toml with no
+classes "constructed 0 mods". the-continent never hit either: it only boots built jars on real servers.
+**Fix:** `tasks.named('runServer', JavaExec) { standardInput = System.in }` (neoforge/build.gradle). In forge/build.gradle,
+Forge's MDK snippet: every source set's `output.resourcesDir` and `java.destinationDirectory` set to one
+`build/sourcesSets/<name>` dir. With that, Forge's console took `list` and `stop` (forge/build.gradle also sets
+`standardInput` when the run task is a `JavaExec`; which of the two made the console work is unverified).
+**Dead ends:** FG7's per-run `mods { register('commitment') { source sourceSets.main } }`: the same crash, removed.
+Gradle's exit code: 0 on the Forge crash. The smoke's first "did it launch" test grepped for
+`Starting minecraft server version` and called the Forge crash "nothing proven" (exit 2). It's a verdict (exit 1).
+It now keys on any log4j line, with a self-test case for each.
+**Affects:** neoforge/build.gradle, forge/build.gradle, scripts/dev-server-smoke.sh
+
+## 2026-10-21 — Forge 26.x `ModList` is all static; use `ForgeVersion.getVersion()`
+**Symptom:** `ModList.get()` → `cannot find symbol` on every Forge node (NeoForge still has the instance API).
+**Cause:** Forge 26.x fmlcore turned `ModList` into static methods (`ModList.getModContainerById(id)`), read with
+`javap` from `fmlcore-26.3-66.0.13.jar`. `ModList` is in fmlcore, not in Forge's injected sources jar.
+**Fix:** `net.minecraftforge.versions.forge.ForgeVersion.getVersion()` for Forge's version;
+`context.getContainer()` for our own.
+**Affects:** forge/src/main/java/com/wulfic/commitment/CommitmentForge.java

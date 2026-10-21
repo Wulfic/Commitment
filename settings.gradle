@@ -1,0 +1,41 @@
+pluginManagement {
+	repositories {
+		maven {
+			name = 'Fabric'
+			url = 'https://maven.fabricmc.net/'
+		}
+		mavenCentral()
+		gradlePluginPortal()
+	}
+}
+
+plugins {
+	// Pinned 2026-10-20 from the Gradle Plugin Portal (0.9.8, 2026-08-31). Needs Gradle 9.0 or newer.
+	id 'dev.kikugie.stonecutter' version '0.9.8'
+}
+
+// Should match the mod id
+rootProject.name = 'commitment'
+
+// One node per Minecraft band: `<branch>/versions/<band>/` builds that branch against that band.
+// common: everything that doesn't touch a loader. Each loader branch compiles it into its own jar.
+// `//? if` comments in the sources select per-band code; the active band's code is the plain one.
+stonecutter {
+	kotlinController = false
+	centralScript = 'build.gradle'
+	create(rootProject) {
+		branch('common') {
+			versions '26.1.2', '26.2', '26.3'
+		}
+		branch('fabric') {
+			versions '26.1.2', '26.2', '26.3'
+		}
+		branch('neoforge') {
+			versions '26.1.2', '26.2', '26.3'
+		}
+		branch('forge') {
+			versions '26.1.2', '26.2', '26.3'
+		}
+		vcsVersion = '26.1.2'
+	}
+}
