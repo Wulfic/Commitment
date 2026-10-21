@@ -1,0 +1,34 @@
+{
+  "// usage": "Template for .mcp.json, which is git-ignored because it holds real tokens. Copy this file to .mcp.json and replace each <...> placeholder. Never commit the filled-in copy; CI's secret scan fails on it. mcp-compressor is fetched on demand via uvx, so `uv` on PATH is the only install (https://docs.astral.sh/uv/).",
+
+  "// cli-syntax": "mcp-compressor 0.31.4 requires `--compression` (not --compression-level), `-H` (not --header), and a `--` separator before the backend URL/args. Backends with no real Authorization header also need a placeholder `-H Authorization=Bearer unused` — without any Authorization header mcp-compressor auto-attempts OAuth discovery and fails, since these backends don't support OAuth.",
+
+  "mcpServers": {
+
+    "github": {
+      "// note": "Self-hosted github-mcp-server (native HTTP) → compressed. <github-mcp-url> is the backend's /mcp endpoint; <github-pat> is a fine-grained PAT scoped to the repos you work on.",
+      "command": "uvx",
+      "args": [
+        "mcp-compressor",
+        "--server-name", "github",
+        "--compression", "high",
+        "--",
+        "<github-mcp-url>",
+        "-H", "Authorization=Bearer <github-pat>"
+      ]
+    },
+
+    "context7": {
+      "// note": "Upstash SaaS — no self-hosting option. Compresses 17k → ~300 tokens. Key from https://context7.com.",
+      "command": "uvx",
+      "args": [
+        "mcp-compressor",
+        "--server-name", "context7",
+        "--compression", "high",
+        "--",
+        "https://mcp.context7.com/mcp",
+        "-H", "Authorization=Bearer <context7-api-key>"
+      ]
+    }
+  }
+}

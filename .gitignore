@@ -1,0 +1,88 @@
+# .gitignore for a Minecraft mod repo (Gradle + Loom / ModDevGradle / ForgeGradle, Stonecutter).
+
+############################
+# Secrets — never tracked. This repo is meant to be safe to make public.
+# Tracked templates hold placeholders: .env.example, .mcp.example.json,
+# .claude/mcp.vscode-reference.example.json. Copy one, fill it in locally.
+# Adding a pattern here does NOT untrack a file already tracked: that needs `git rm --cached`.
+############################
+.env
+.env.*
+!.env.example
+.mcp.json
+.vscode/mcp.json
+.claude/mcp.vscode-reference.json
+.claude/settings.local.json
+credentials*
+secrets*
+*.pem
+*.key
+*.crt
+*.p12
+*.jks
+*.keystore
+
+############################
+# Gradle / Java build output
+############################
+.gradle/
+build/
+out/
+bin/
+classes/
+target/
+*.class
+hs_err_pid*
+replay_pid*
+*.hprof
+
+# Jars are build output, except the Gradle wrapper, which a fresh clone and CI need.
+*.jar
+!gradle/wrapper/gradle-wrapper.jar
+
+############################
+# Minecraft runs — dev worlds, copies of saves, harness scripts. Disposable, and often big.
+############################
+run/
+runs/
+logs/
+crash-reports/
+remappedSrc/
+
+############################
+# Editor / IDE
+############################
+.vscode/
+.idea/
+*.iml
+*.ipr
+*.iws
+.classpath
+.project
+.settings/
+.factorypath
+*.code-workspace
+
+############################
+# Python (repo tooling and harness scripts)
+############################
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+
+############################
+# OS
+############################
+.DS_Store
+Thumbs.db
+desktop.ini
+
+############################
+# Logs, archives, local files
+############################
+*.log
+*.zip
+*.7z
+*.tar.gz
+local.properties

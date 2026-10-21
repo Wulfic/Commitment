@@ -1,0 +1,38 @@
+{
+  "_comment": "VS Code MCP format reference (key: servers). Template for .claude/mcp.vscode-reference.json, which is git-ignored because it holds real tokens. Copy it, replace each <...> placeholder, and keep it in step with .mcp.json (key: mcpServers), the active Claude Code config.",
+
+  "_cli-syntax": "mcp-compressor 0.31.4 requires `--compression` (not --compression-level), `-H` (not --header), and a `--` separator before the backend URL/args. Backends with no real Authorization header also need a placeholder `-H Authorization=Bearer unused`, or mcp-compressor auto-attempts OAuth discovery and fails.",
+
+  "servers": {
+
+    "github": {
+      "// note": "Self-hosted github-mcp-server (native HTTP) → compressed.",
+      "command": "uvx",
+      "args": [
+        "mcp-compressor",
+        "--server-name", "github",
+        "--compression", "high",
+        "--",
+        "<github-mcp-url>",
+        "-H", "Authorization=Bearer <github-pat>"
+      ],
+      "env": { "PYTHONUTF8": "1" },
+      "type": "stdio"
+    },
+
+    "context7": {
+      "// note": "Upstash SaaS — no self-hosting option. Compresses 17k → ~300 tokens.",
+      "command": "uvx",
+      "args": [
+        "mcp-compressor",
+        "--server-name", "context7",
+        "--compression", "high",
+        "--",
+        "https://mcp.context7.com/mcp",
+        "-H", "Authorization=Bearer <context7-api-key>"
+      ],
+      "env": { "PYTHONUTF8": "1" },
+      "type": "stdio"
+    }
+  }
+}
