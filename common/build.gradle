@@ -61,6 +61,10 @@ java {
 test {
 	useJUnitPlatform()
 	systemProperty "commitment.commonSources", sourceSets.main.java.srcDirs.collect { it.absolutePath }.join(File.pathSeparator)
+	// InternetTimeTest holds the README's privacy note to the hosts the mod asks. An input, so editing the README
+	// alone reruns it.
+	systemProperty "commitment.repoRoot", rootDir.absolutePath
+	inputs.file(rootProject.file("README.md"))
 	testLogging {
 		events = ["passed", "skipped", "failed"]
 		exceptionFormat = "full"

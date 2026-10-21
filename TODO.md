@@ -377,7 +377,7 @@ place. Clock tests use the injected clock.
       committed is `LockStore.Loaded` (B.3), so no separate `LockState` class. `status` reads the clock only while
       a timer runs. Common 168 tests per node (14 new). Mutations: boundary `>=` → `>` gives 3 red; an
       unreachable clock read as "lifted" gives 1 red; both restored and `cmp`-verified.
-- [ ] B.5 `TrustedTime`: HTTPS `Date` headers from 2+ hosts that must agree within 5 min, short
+- [x] B.5 `TrustedTime`: HTTPS `Date` headers from 2+ hosts that must agree within 5 min, short
       timeouts, every failure logged. Queried only at `/unlock confirm` and at world open while a
       timer runs. Tests against a local stub server. README privacy note.
 - [ ] B.6 `GuardPack` generator + the lift-lock deleter (**the destructive path**): golden-file

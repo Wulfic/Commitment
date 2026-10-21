@@ -24,6 +24,24 @@ Quilt runs the Fabric jar, so there is no separate Quilt jar. Quilt Loader has o
 (0.31.0-beta.4). NeoForge and Forge have no stable build for 26.1 or 26.1.1, so their 26.1 jars run on 26.1.2
 only.
 
+## Privacy
+
+Commitment goes online for one thing: the unlock timer uses internet time, so moving your computer's clock can't
+shorten it. It asks only when you run `/unlock confirm`, and when you open a world while an unlock is running. It
+sends a plain HEAD request to each of these, and reads the `Date` header of the reply:
+
+- `www.google.com`
+- `www.cloudflare.com`
+- `www.microsoft.com`
+
+Two of them have to agree within five minutes. The request carries nothing about you, your world or your mods,
+though like any web request it shows those hosts your IP address. With no internet connection, an unlock can't
+start or finish, and the world stays locked.
+
+Commitment also keeps a copy of each world's lock outside the game folder, so deleting the mod or its config
+doesn't unlock anything: `%LOCALAPPDATA%\Commitment\locks` on Windows, `~/Library/Application Support/Commitment/locks`
+on macOS, and `$XDG_DATA_HOME/commitment/locks` (or `~/.local/share/commitment/locks`) on Linux. Each file is a few KB.
+
 ## License
 
 MIT, see [LICENSE](LICENSE).

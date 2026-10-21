@@ -14,10 +14,16 @@
   boot smoke exit 0 on all 9, client world check PASS on all 3 Fabric nodes.
 - **Owner rulings, session 3:** world game settings (difficulty, game rules, cheats, default gamemode) are locked and
   **reverted live** (new step C.6); on a dedicated server the whole `server.properties` is locked (decisions.md).
-- **B.1 done:** `common/.../manifest/` scanner, 84 common tests per node, every guard mutation-checked.
+- **B.1–B.5 done** (commits d65ec16, b43f1b2, b65d620, c14c2bb, then B.5): scanner, diff lines, signed lock record +
+  mirror + reconciliation, 24 h timer, internet time (`InternetTime`: google/cloudflare/microsoft, 2 of 3 within
+  5 min, `HttpURLConnection`). Common has 179 tests per node; every guard was mutation-checked. **Not pushed yet**:
+  the owner's rule is to push each green stage, and Stage B ends at B.6.
 
 ## Next
-1. **B.2** `ManifestDiff` → readable lines, capped. Then B.3–B.6, one commit each; push when Stage B is green.
+1. **B.6** `GuardPack` generator + the lift-lock deleter (the destructive path: use `guard-destructive`).
+   `LockCodec.isOurs(bytes, lockId)` is the marker check for records. Then push Stage B.
+2. Stage C: the gate must pass `LockStore.load` the seed (read-only from level.dat) and the guard pack's lock id.
+   `InternetTime.read()` blocks for up to ~9 s, so it can't run on the render thread at world open.
 2. Stage C needs a real-server smoke tool (copy `../the-continent/tools/server_smoke.py`) for Proof 4 (vanilla
    server, guard pack only) and Proof 7 (Quilt + built jars).
 
