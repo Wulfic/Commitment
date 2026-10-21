@@ -235,3 +235,18 @@ failed-data-pack screen shows a generic message, and (from memory, to confirm in
 button loads the world with only the vanilla pack, leaving the guard switched off: one click and it's beaten.
 If 0.2 shows Safe Mode leaves world packs enabled, revisit this.
 **Affects:** TODO.md (Commitment plan: Approach, 0.2)
+
+## 2026-10-21 — Commitment Stage 0: GO on the guard pack; scaffold keeps the-continent's proven toolchain
+**Context:** TODO.md 0.2 was the go/no-go for the vanilla guard datapack. 0.1 found Loom 1.19.2 newer than
+the-continent's 1.18.4, and newer Forge recommended builds (64.1.5 / 65.1.5 / 66.1.0).
+**Choice:** GO: one `pack.mcmeta` (`min_format` 101, `max_format` 121, no legacy fields) loads on every 26.x node,
+world packs are auto-enabled on all four loaders, and tick functions run at gamemaster level without cheats
+(evidence in TODO.md 0.2). Scaffold pins: Gradle 9.7.1, Loom 1.18.4, MDG 2.0.148, ForgeGradle 7.0.40,
+Stonecutter 0.9.8 (all verified building these exact nodes in the-continent), with today's Fabric API,
+NeoForge and Forge builds from official metadata. Owner, same day: push each green stage, MIT, and an expired
+timer still needs internet time to lift (fail closed).
+**Why:** A toolchain proven on this machine against these nodes takes the build system out of the list of
+suspects while the scaffold goes in. A Loom bump is a separate, revertible step.
+**Rejected:** Loom 1.19.2 on day one (unproven here, and it may need a newer Gradle). A per-version guard pack
+(not needed: the codec is the same on every node).
+**Affects:** TODO.md Stage 0, gradle.properties, settings.gradle (Stage A)

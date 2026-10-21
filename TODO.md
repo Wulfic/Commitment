@@ -56,6 +56,10 @@ world. Unlocking needs internet time. Only resource packs are locked; video, sha
 settings stay free. `/commit` gets a confirm too. Dedicated servers are in. The lock lifts by
 itself after 24 h. Commitment's own updates don't count as a change.
 
+**Owner rulings, 2026-10-21 (session 2):** push each green stage to `origin/main`. Stop and report
+only on a 0.2 no-go or a fact that changes the design. Once the 24 h have passed, the lock still
+stays on until internet time confirms it (fail closed, and the screen says why). MIT license.
+
 **Approach:** **The mod stops the launch.** Before the world loads, it compares the setup with
 the committed one. On a mismatch the player gets the LockedScreen: what changed, Back, and the
 optional 24-hour unlock button. A dedicated server logs the changes and stops. No world loads
@@ -85,7 +89,8 @@ Fabric jar.
 Rejected: a sealed `level.dat` (above; superseded, decisions.md 2026-10-21). A guard pack that
 fails to load on purpose without the mod, so vanilla stops the launch: vanilla's "failed to load
 data packs" screen can't show our message or an unlock button, and its Safe Mode button loads the
-world without the pack in one click and leaves the guard switched off (to confirm in 0.2). A lock file only in
+world without the pack in one click, on every launch (0.2: Safe Mode doesn't add the pack to the
+disabled list, but a pack built to fail fails again on every launch). A lock file only in
 `config/` (deleted with the mod in one step). A mod-registered dimension that vanilla can't load
 without the mod: vanilla's "safe mode" prompt is one click and may drop the dimension's data.
 Gamemode spectator as the penalty: the old gamemode would need storing and restoring, and hardcore
@@ -106,6 +111,7 @@ The player owns every file, so this is friction, not security. Each row is a Sta
 | Hand-edit the lock record | HMAC fails, so it's treated as tampered: locked, and the only way out is the 24 h timer |
 | Move the clock forward | Still locked: the timer uses internet time |
 | `/datapack disable` with cheats on (e.g. Open to LAN) | Works only without the mod. With it, the pack is re-enabled at server start |
+| `/tick freeze` with cheats on, mod deleted | The guard pauses, but so does the world (0.2). Same cheats bar as the row above |
 | **Still works, and the README says so:** delete the mod **and** the guard pack from the world folder; edit both records and the mirror; decompile the jar | Takes knowing where the world folder is and what to delete. That's the bar the owner set |
 
 ### Behaviour spec
@@ -135,7 +141,7 @@ The player owns every file, so this is friction, not security. Each row is a Sta
   `incompatibleResourcePacks` keys of `options.txt`.
 - **Never locked:** every other `options.txt` setting (video, audio, controls, keybinds), shader
   packs (`shaderpacks/`, chosen pack and its options), and a built-in list of video, shader and
-  audio mods' config files (Sodium, Embeddium, Iris, Oculus and the like; grown in Stage E). On
+  audio mods' config files (the list from 0.4; grown in Stage E). On
   top of that comes the ignore list of files mods rewrite on every boot.
 
 **Not doing (v1):** writing to `level.dat` or any other vanilla file (vanilla records the guard
@@ -174,11 +180,21 @@ place. Clock tests use the injected clock.
 
 ### Stage 0: facts before code (no source)
 
-- [ ] 0.1 Every 26.x release from `piston-meta` `version_manifest_v2.json`. For each one, the
+- [x] 0.1 Every 26.x release from `piston-meta` `version_manifest_v2.json`. For each one, the
       Fabric Loader + API, Quilt Loader, NeoForge and Forge builds from official metadata, dated.
       Nodes and per-loader ranges written here (start from the-continent's split: 26.1–26.1.2 on
       26.1.2, 26.2, 26.3; NeoForge/Forge 26.1.2 only). Check for 26.4.
-- [ ] 0.2 **Go/no-go for the guard pack**, from each node's jar: is a zip dropped into
+      **Result, fetched 2026-10-21:** releases 26.1, 26.1.1, 26.1.2, 26.2, 26.3. 26.4 is still
+      only snapshots (snapshot-5 came out 2026-10-20), so no node for it. Nodes: **26.1.2, 26.2,
+      26.3**. Fabric's 26.1.2 jar runs on `>=26.1 <26.2`; the NeoForge and Forge 26.1 jars run on
+      26.1.2 only (NeoForge 26.1.0 and 26.1.1 have betas only). Pins: Fabric Loader 0.19.5 (newest
+      stable; 0.20.x isn't stable), Fabric API 0.155.3+26.1.2 / 0.161.0+26.2 / 0.164.0+26.3;
+      NeoForge 26.1.2.122 / 26.2.0.93 / 26.3.0.95, MDG 2.0.148; Forge (promotions, recommended)
+      64.1.5 / 65.1.5 / 66.1.0, ForgeGradle 7.0.40; Stonecutter 0.9.8; Quilt Loader
+      0.31.0-beta.4 (betas only). Loom: 1.19.2 is out, but the scaffold keeps the-continent's
+      proven Loom 1.18.4 + Gradle 9.7.1 (decisions.md 2026-10-21).
+      Data pack format per `version.json`: 26.1/26.1.1/26.1.2 = 101.1, 26.2 = 107.1, 26.3 = 121.0.
+- [x] 0.2 **Go/no-go for the guard pack**, from each node's jar: is a zip dropped into
       `<world>/datapacks/` enabled on the next load; when `#minecraft:load` runs relative to the
       first tick; `schedule` counts game ticks; the function permission level in singleplayer
       and the default `function-permission-level` on a dedicated server; the permission levels
@@ -189,12 +205,48 @@ place. Clock tests use the injected clock.
       it doesn't, a launch-time stop comes back into play as the fallback). If no
       single pack loads everywhere, generate it per version at commit time and re-write it when
       the world opens on another version.
-- [ ] 0.3 The client's world-open flow per node (where the LockedScreen takes over before the
-      integrated server starts; 26.2 moved screens onto `Minecraft.gui`) and the dedicated
-      server's world-load point.
-- [ ] 0.4 Config file names of the common video, shader and audio mods on 26.x (Sodium,
-      Embeddium, Iris, Oculus, Distant Horizons, Sound Physics and the like) for the never-locked
-      list, read from their own jars or repos.
+      **Result: GO.** Decompiled with Vineflower 1.12.0 from the cached merged jars of 26.1,
+      26.1.2, 26.2 and 26.3, plus the Forge 66.0.13 and NeoForge 26.3.0.95 patched sources.
+  - [x] Auto-enable: `MinecraftServer.configurePackRepository` (identical on all four) adds every
+        available pack that isn't on the disabled list and whose source `shouldAddAutomatically()`.
+        `PackSource.WORLD` returns true. Log line: `Found new data pack file/<name>, loading it
+        automatically`. Forge and NeoForge only add their mod packs around that loop.
+  - [x] One `pack.mcmeta` for every node: `{"pack":{"description":…,"min_format":101,"max_format":121}}`.
+        `PackFormat.IntermediaryFormat.validate` is the same on all four. With `min_format` above
+        81 (data's `lastPreMinorVersion`), `pack_format`/`supported_formats` aren't needed, and
+        `supported_formats` there is an error. The compatibility check only labels the pack
+        "(incompatible)" in lists. It never stops an enabled pack from loading, so a future 26.4
+        still loads it.
+  - [x] Timing: `ServerFunctionManager.tick()` runs `#minecraft:load` on the first tick after
+        every (re)load, then `#minecraft:tick` every tick, **only while
+        `tickRateManager().runsNormally()`**, so `/tick freeze` pauses the guard (cheats only).
+        `schedule` counts game ticks.
+  - [x] Permissions: tag functions run as `getGameLoopSender()`, which is always
+        `LevelBasedPermissionSet.GAMEMASTER`, whatever `function-permission-level` says.
+        `effect`, `title`, `data`, `schedule` and `say` all need `LEVEL_GAMEMASTERS`, so all of
+        them run in singleplayer without cheats and on a dedicated server.
+  - [x] Safe Mode: `DatapackLoadFailureScreen` offers Back and Safe Mode. Safe Mode selects
+        `vanilla` (plus mod packs on Forge/NeoForge) and saves the config with
+        `disableInactive=false`, so the disabled list is **empty**: the guard comes back
+        automatically on the next normal launch. It's still a one-click bypass on every launch for
+        a pack built to fail, so that design stays rejected. The server has `--safeMode` too.
+- [x] 0.3 **Client gate:** `WorldOpenFlows.openWorld(String levelId, Runnable onCancel)`, at HEAD,
+      before `createWorldAccess` takes the session lock. Same signature on all nodes. Back →
+      `onCancel`. `minecraft.gui.setScreen` arrived in **26.2** (26.1.x uses
+      `minecraft.setScreen`). Its only callers, on 26.1 and 26.3 alike, are the world list
+      (`WorldSelectionList$WorldListEntry`), the title screen's demo world and `QuickPlay`. **Server gate:**
+      `net.minecraft.server.Main.main`, right after `levelStorageSource.validateAndCreateAccess(levelName)`
+      and before the level data and datapacks load. Vanilla bails out there with log + `return`.
+      For our non-zero exit we need to close the access first. Edge case for Stage D: "Re-Create"
+      world copies `datapacks/`, so the new world gets the guard pack without a record.
+- [x] 0.4 Never-locked list, from each mod's newest 26.3 jar on Modrinth (2026-10-21): Sodium
+      0.9.3-beta.1 `sodium-options.json`, `sodium-mixins.properties`, `sodium-fingerprint.json`; Iris
+      1.11.7 `iris.properties`, `iris-excluded.json`, plus the `shaderpacks/` dir; Distant Horizons
+      3.3.4 `DistantHorizons.toml`; ImmediatelyFast 1.17.1 `immediatelyfast.json`; EntityCulling
+      1.11.3 `entityculling.json`; Dynamic FPS 3.11.10 `dynamic_fps*` (the name is built at runtime,
+      so confirm it in Stage E); Sound Physics Remastered 1.5.2 `sound_physics_remastered/`;
+      Presence Footsteps 1.14.0 `presencefootsteps/`; AmbientSounds 6.3.11 `ambientsounds/`.
+      **Embeddium and Oculus have no 26.x build**, so they're left off.
 
 ### Stage A: scaffold (copy `../the-continent`, commit when green)
 

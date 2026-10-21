@@ -92,3 +92,15 @@ new leaks; it does not unleak. The credentials need rotating, and the template's
 history needs rewriting (or the repo recreating) before **it** goes public. Repos created
 with "Use this template" start from a fresh single commit of the current tree, so they're clean.
 **Affects:** `.gitignore`, `.env.example`, `.mcp.example.json`, `.claude/mcp.vscode-reference.example.json`
+
+## 2026-10-21 — Vanilla Safe Mode does not leave world datapacks disabled; `/tick freeze` stops tag functions
+**Symptom:** decisions.md 2026-10-21 ("without the mod, the fallback is in-game effects") assumed, from memory,
+that the failed-datapack screen's Safe Mode leaves the guard pack switched off for good.
+**Cause:** `configurePackRepository(..., safeMode=true)` selects `vanilla` (plus mod packs on Forge/NeoForge) and
+saves with `disableInactive=false`, so the **disabled list is empty**. Any world pack comes back automatically on
+the next normal launch ("Found new data pack …, loading it automatically"). Separately, `ServerFunctionManager.tick()`
+skips `#load` and `#tick` while `tickRateManager().runsNormally()` is false, so `/tick freeze` pauses the guard.
+**Fix:** None needed. The fail-to-load design stays rejected (Safe Mode is still a one-click bypass on every launch for
+a pack that always fails). `/tick freeze` needs cheats, which is the same bar as `/datapack disable`.
+**Dead ends:** Reasoning about Safe Mode from memory. Decompile `MinecraftServer.getSelectedPacks` instead.
+**Affects:** TODO.md 0.2, the future guard pack and threat-model table
