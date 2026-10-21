@@ -338,7 +338,7 @@ place. Clock tests use the injected clock.
       line shows a hash or a value. ASCII `->` (a Windows server console mangles `→`). `./gradlew build` exit 0 on
       all 12 nodes: common 111 tests per node (27 new), fabric 10, "All 2 required tests passed" ×3. Mutations:
       cap off by one → 2 red; ordering removed → 1 red; both restored and `cmp`-verified.
-- [ ] B.3 `LockRecord` (NBT, HMAC-signed) + `LockStore`: world record, OS mirror, and the
+- [x] B.3 `LockRecord` (NBT, HMAC-signed) + `LockStore`: world record, OS mirror, and the
       reconciliation rules (one valid copy restores the rest; tampered or missing while the guard
       pack exists → locked, and only the timer gets out; a mirror dir that can't be written →
       logged, world record only). Tests: every present/missing/tampered combination of the three.
@@ -360,6 +360,14 @@ place. Clock tests use the injected clock.
       record or the guard pack), else by scanning the mirror dir for seed + folder name. Tests: every
       missing/valid/tampered combination × guard pack present/absent; a flipped byte → tampered; a
       record from another lock id copied in → tampered; revision order; unwritable mirror → world only.
+      **Done 2026-10-21:** `common/.../lock/` (`LockRecord`, `LockCodec`, `LockStore`, `MirrorDir`, `WorldSettings`).
+      One refinement: the seed + folder scan runs **only with a known seed** (a folder-only match on a reused name
+      like "New World" would lock a world that was never committed), so C.2 must hand the gate the seed. Common
+      154 tests per node (43 new: the 18-row world × mirror × guard matrix, a flip of every byte of the record,
+      truncation, a 17 MB gzip, foreign lock id and seed, a misnamed mirror, revisions, an unwritable or absent
+      mirror dir, a world record that can't be read). Mutations, each 1 red and restored (`cmp`-verified): HMAC
+      check off; another lock's record accepted; the guard pack not counted as evidence; mirror matched by
+      folder alone; a misnamed mirror trusted.
 - [ ] B.4 `LockState` + `UnlockTimer` with an injected `TrustedClock`: uncommitted → committed →
       pending(requestedAt) → lifted, and cancel. Tests: 23:59:59 locked and 24:00:00 lifted;
       system clock +48 h with internet time +1 h → locked; no internet time → can't start and
@@ -379,7 +387,9 @@ place. Clock tests use the injected clock.
       self-heal at server start (rebuild a missing piece, re-enable a disabled pack). GameTests
       from Proof 2.
 - [ ] C.2 World-open gate: scan, compare; a mismatch → the LockedScreen (client) or log and stop
-      (server); a timer that has run out → lift.
+      (server); a timer that has run out → lift. The gate passes `LockStore.load` the world's seed (read
+      from `level.dat`, read-only) and the guard pack's lock id; without the seed, a world whose record
+      and guard pack were both deleted can't be matched to its mirror (B.3).
 - [ ] C.3 Commands per the spec, registered through the platform seam. Server GameTests: every
       transition, each message, the 60 s confirm expiry, a non-host refused.
 - [ ] C.4 The LockedScreen per node: diff, Back, start-unlock with confirm, countdown, cancel.
