@@ -180,3 +180,58 @@ behind it is what CI can check.
 the band claim: mcMMO's docs were wrong on bands for months while every guard was green.
 **Affects:** `.claude/skills/mc-port/SKILL.md`, `.github/skills/mc-port/SKILL.md`, `AGENTS.md`,
 `.github/copilot-instructions.md`
+
+## 2026-10-21 — Commitment: the lock lives inside the world (sealed `level.dat`), four loaders from one tree
+**Context:** The owner asked for a mod, for every 26.x version on Fabric, Quilt, NeoForge and Forge, that locks
+the player's setup (mods, resource packs, config) after `/commit`. A changed setup makes the world refuse to load,
+with an optional unlock that takes 24 hours (`/unlock` → `/unlock confirm`). It has to hold "even if the mod has
+been deleted". The player owns every file, so nothing client-side can be tamper-proof. The aim is that every easy
+bypass fails, so the 24-hour wait is cheaper than cheating.
+**Choice:** (planned, not implemented; TODO.md Stage 0.2 is the go/no-go) While a world is committed, Commitment
+writes `level.dat` and `level.dat_old` sealed: AES-GCM over the real level data plus the lock state, with the key
+derived from a constant in the jar and a per-world salt. No loader can open the world without Commitment, and
+reinstalling it brings back the same lock. The unlock timer uses trusted network time (HTTPS `Date` from 2+ hosts),
+failing closed when offline (open question 2). Layout copies the-continent: loader-free `common`, plus
+`fabric`/`neoforge`/`forge` branches × Stonecutter 26.x nodes; Quilt runs the Fabric jar.
+**Why:** The lock state is the thing being protected, so it has to travel inside the one file the world can't
+open without. A seal on `level.dat` costs one write per save, against a seal on every chunk. The first seal comes
+only after a verified backup, which is also the recovery if Commitment has a bug.
+**Rejected:** A lock file or config in the instance (deleted with the mod). Encrypting region files (a seal on
+every chunk write, and one bug puts the whole world at risk). OS-level guards (admin rights, outside Minecraft,
+behaves like malware). A stub `level.dat` that vanilla opens into an empty world (vanilla would save over the real
+player data). System-clock timers (moving the clock forward beats them). A separate Quilt jar and Architectury
+(see the-continent decisions 2026-10-20).
+**Affects:** TODO.md (Commitment plan), the future `common/` seal, scanner and timer, and the mixins on the
+`level.dat` read and write path
+
+## 2026-10-21 — Commitment: guard datapack + mirrored lock record (supersedes the sealed `level.dat` entry above)
+**Context:** Owner, reviewing the first plan: make tampering inconvenient, not impossible ("the average user
+is too dumb to figure it out"), don't touch `level.dat`, and don't spend space on backups. Their answers to the
+open questions: lock per world; unlocking needs internet time; only resource packs locked (video, shader and
+audio settings stay free); confirm on `/commit` too; dedicated servers in; the lock lifts automatically after
+24 h; Commitment's own updates don't count as a change.
+**Choice:** (planned, not implemented; TODO.md Stage 0.2 is the go/no-go) Three small files Commitment owns,
+each able to rebuild the others: an HMAC-signed lock record in `<world>/data/commitment.dat`, a mirror in the OS
+user data dir keyed by lock id, and a vanilla guard datapack in `<world>/datapacks/`. The pack checks a
+heartbeat the mod writes to command storage every tick. Without the mod it blinds, slows and protects every
+player with 3-second effects, and shows "reinstall Commitment". Vanilla files are never written by Commitment.
+**Why:** The guard runs where the mod can't, after the mod has been deleted, using only vanilla. Nothing the
+player owns is overwritten, so there's nothing to back up and a bug can't destroy a world. Getting past it means
+finding the world folder and knowing which pack to delete, which matches the owner's "inconvenient" bar.
+**Rejected:** The sealed `level.dat` (the entry above): one bug bricks a world, and a backup to make it safe
+costs the space the owner won't spend. Gamemode spectator as the penalty (needs the old gamemode stored and
+restored; hardcore treats it as death). A mod-registered dimension that vanilla can't load (vanilla's "safe
+mode" is one click and may drop the dimension's data). A lock that lives only in `config/` (deleted with the mod).
+**Affects:** TODO.md (Commitment plan), the future `common/` lock record, guard pack, scanner and timer
+
+## 2026-10-21 — Commitment: without the mod, the fallback is in-game effects, not a vanilla launch stop
+**Context:** Owner asked whether stopping the player at world launch, with the message and the unlock button,
+would be better than the guard pack's effects.
+**Choice:** With the mod present, the launch stop *is* the primary mechanism: the world-open gate and the
+LockedScreen (TODO.md C.2/C.4). The guard pack's effects remain the fallback for a deleted mod only.
+**Why:** Without the mod no Commitment code runs at launch, so nothing can show a custom screen or a button.
+**Rejected:** A guard pack built to fail validation without the mod, so vanilla refuses the launch. Vanilla's
+failed-data-pack screen shows a generic message, and (from memory, to confirm in TODO.md 0.2) its Safe Mode
+button loads the world with only the vanilla pack, leaving the guard switched off: one click and it's beaten.
+If 0.2 shows Safe Mode leaves world packs enabled, revisit this.
+**Affects:** TODO.md (Commitment plan: Approach, 0.2)

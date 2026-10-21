@@ -8,27 +8,24 @@
 **Branch:** `main`, always (decisions.md 2026-10-21).
 
 ## Where we are
-This repo is the **Minecraft mod template**. No mod code yet: agent rules (`AGENTS.md`
-`Minecraft Mod Development`), 13 skills (`dev-server` and `mc-port` new; the rest Gradle/MC
-first), and secrets untracked so a repo made from it can start public.
+This repo is now **Commitment**: a mod that locks a world's setup (mods, resource packs, config) after
+`/commit`, with a 24-hour unlock. **Planned, no code yet.** The plan is in `TODO.md` (Tier 2, Stages 0–F, revised after the
+owner's answers), and the design is in decisions.md 2026-10-21 "guard datapack + mirrored lock record". The
+sealed-`level.dat` design is superseded: never write vanilla files, never make backups.
 
-## When a new mod repo is created from this template
-1. Fill in `README.md`: what the mod does, **the current band and its Minecraft versions,
-   and that older bands get no fixes** (decisions.md 2026-10-21).
-2. Copy `.env.example` → `.env`, `.mcp.example.json` → `.mcp.json`,
-   `.claude/mcp.vscode-reference.example.json` → `.claude/mcp.vscode-reference.json`; fill in.
-3. Scaffold (Tier 2 plan): versions and pins from metadata (`mc-port`), then the dev server
-   per `dev-server` Part A: own port (not 25565, not another repo's), `run/server` +
-   `run/client`, EULA task, `scripts/dev-server-smoke.sh`. Record the port here.
-4. Rewrite this file for that project.
+## Next
+1. The owner's rulings are recorded in `TODO.md` (all 7 questions answered 2026-10-21).
+2. Stage 0: version and loader facts from metadata, then **0.2 go/no-go**: does one guard datapack load and
+   run on every 26.x node (auto-enable, `#minecraft:load` timing, permission levels, `pack.mcmeta` format range)?
+3. Stage A: scaffold copied from `../the-continent` (same common/fabric/neoforge/forge × 26.x layout).
+   Pick and record the dev-server port here.
 
 ## Open questions / blockers
-- **Rotate the credentials** that were tracked before 2026-10-21 (GitHub PAT, context7 key,
-  the `.env` passwords). They're still in commit `8108c25` on `origin/main`, and in the
-  other mod repos that copied this template (gotchas.md 2026-10-21).
-- The template repo itself is private and its history holds those secrets. Making **it**
-  public needs a history rewrite or a fresh repo: the owner's call.
+- **Rotate the credentials** that were tracked in this template's history before 2026-10-21 (commit `8108c25`;
+  gotchas.md 2026-10-21). This repo started from the clean template commit `33f52b4`.
 - `PowerShell(...)` permission-rule matching is unverified; treat the PowerShell tool as ungated.
 
 ## Do not forget
 - `.claude/skills/` and `.github/skills/` are hand-synced copies — edit both or they drift.
+- Development commits only `run/` worlds or disposable copies, never the owner's saves or instance in place.
+  Commitment also writes a mirror file under the OS user data dir: clean it up after tests.
