@@ -60,6 +60,13 @@ itself after 24 h. Commitment's own updates don't count as a change.
 only on a 0.2 no-go or a fact that changes the design. Once the 24 h have passed, the lock still
 stays on until internet time confirms it (fail closed, and the screen says why). MIT license.
 
+**Owner rulings, 2026-10-21 (session 3):** the lock also covers the world's **game settings**:
+difficulty, game rules, cheats (`allowCommands`) and the default gamemode. They're **reverted live**:
+while committed, the mod puts the committed value back through vanilla's API within a second, with a
+chat message, and puts a drifted value back at world open too. Commitment still never writes
+`level.dat`. Vanilla saves its own state, as it does for the guard pack. On a dedicated server, **the
+whole `server.properties`** is locked, motd and port included.
+
 **Approach:** **The mod stops the launch.** Before the world loads, it compares the setup with
 the committed one. On a mismatch the player gets the LockedScreen: what changed, Back, and the
 optional 24-hour unlock button. A dedicated server logs the changes and stops. No world loads
@@ -112,6 +119,9 @@ The player owns every file, so this is friction, not security. Each row is a Sta
 | Move the clock forward | Still locked: the timer uses internet time |
 | `/datapack disable` with cheats on (e.g. Open to LAN) | Works only without the mod. With it, the pack is re-enabled at server start |
 | `/tick freeze` with cheats on, mod deleted | The guard pauses, but so does the world (0.2). Same cheats bar as the row above |
+| `/difficulty`, `/gamerule`, the difficulty button, Open to LAN with cheats, another mod's change | Put back within 1 s, with "Commitment: <setting> is locked" |
+| Edit difficulty or game rules in `level.dat` with the mod removed, then reinstall | Put back at the next world open |
+| Edit `server.properties` on a committed dedicated server | Locked at the next start: logs the changed keys (never their values) and stops |
 | **Still works, and the README says so:** delete the mod **and** the guard pack from the world folder; edit both records and the mirror; decompile the jar | Takes knowing where the world folder is and what to delete. That's the bar the owner set |
 
 ### Behaviour spec
@@ -137,8 +147,16 @@ The player owns every file, so this is friction, not security. Each row is a Sta
 - **What's locked:** the loader and its version, the Minecraft version, every mod (id, version and
   the SHA-256 of its jar; Commitment's own version and jar are left out), `config/` and
   `defaultconfigs/` by content, the enabled resource packs in order with each pack's content hash,
-  the world's `datapacks/` (except the guard), and **only** the `resourcePacks` /
-  `incompatibleResourcePacks` keys of `options.txt`.
+  the world's `datapacks/` (except the guard), the world's `serverconfig/` (Forge and NeoForge
+  per-world mod config) by content, **only** the `resourcePacks` / `incompatibleResourcePacks` keys of
+  `options.txt`, and on a dedicated server every key of `server.properties`. The diff names a changed
+  property, never its value (`rcon.password` lives there).
+- **World game settings** (difficulty and whether it's locked, every game rule, `allowCommands`, the
+  default gamemode, hardcore) are held in the lock record and **reverted live**, not refused at open:
+  checked every 20 ticks and at server start, the committed value put back through vanilla's API, and
+  `Commitment: <setting> is locked` sent to the player who changed it (or everyone, if it's unknown).
+  Whether hardcore can be set back through the API is a Stage C fact; if it can't, a drifted hardcore
+  flag is a setup change at world open.
 - **Never locked:** every other `options.txt` setting (video, audio, controls, keybinds), shader
   packs (`shaderpacks/`, chosen pack and its options), and a built-in list of video, shader and
   audio mods' config files (the list from 0.4; grown in Stage E). On
@@ -282,7 +300,7 @@ place. Clock tests use the injected clock.
 
 ### Stage B: core in `common`, pure Java, JUnit first (commit per step)
 
-- [ ] B.1 `Manifest` + `ManifestScanner` over a `GameEnvironment` seam (the loader's mod list and
+- [x] B.1 `Manifest` + `ManifestScanner` over a `GameEnvironment` seam (the loader's mod list and
       instance paths): content hashes, semantic compare for json/toml/properties, the never-locked
       list and the ignore list. Tests: add, remove and change one item of each kind → exactly that
       diff; a reordered json → no diff; a change to render distance, volume, a shader pack or
@@ -299,11 +317,29 @@ place. Clock tests use the injected clock.
       `.properties` → sorted `key=value`; toml/cfg/txt → comments, blank lines and trailing
       whitespace dropped (no TOML parser on Fabric's classpath; a key reorder in toml still counts as
       a change, and Stage E will show whether that matters). Paths use `/` on every OS.
+      **Added 2026-10-21 (session 3 rulings):** `serverconfig/<relpath>` (the world's, same rules as
+      `config/`), and on a dedicated server `server.properties/<key>` → hash of the value, one key per
+      property so the diff can name it without printing it. The `java` mod id is left out (a JRE
+      update isn't a setup change; owner can overrule). OS junk (`.DS_Store`, `Thumbs.db`,
+      `desktop.ini`) is on the ignore list. An unreadable file fails the scan with its path, so the
+      caller can log it and refuse (fail closed). World game settings are **not** in the manifest:
+      they're a separate snapshot (B.3) with their own enforcement (C.6).
+      **Done 2026-10-21:** `common/.../manifest/` (`GameEnvironment`, `Manifest`, `ManifestDiff`,
+      `ManifestScanner`, `Fingerprints`, `Exclusions`). `./gradlew build` exit 0 on all 12 nodes; counts from
+      the XML: common 84 tests per node (54 scanner: 24 one-change cases, 21 no-change cases, 9 more; 23
+      exclusions; 5 fingerprints), fabric 10 per node, 0 failed; "All 2 required tests passed" on all three
+      Fabric nodes. Mutation checks, each restored and `cmp`-verified: never-locked list off → 23 red;
+      Commitment/java locked → 3 red; guard pack scanned → 2 red; config hashed raw → 6 red; server.properties
+      read on a client → 2 red; the outside-`resourcepacks/` check off → 1 red. Rung 3 doesn't apply yet:
+      nothing calls the scanner until C.2, which carries the dev-server proof.
 - [ ] B.2 `ManifestDiff` → readable lines, capped. Test the cap and the order.
 - [ ] B.3 `LockRecord` (NBT, HMAC-signed) + `LockStore`: world record, OS mirror, and the
       reconciliation rules (one valid copy restores the rest; tampered or missing while the guard
       pack exists → locked, and only the timer gets out; a mirror dir that can't be written →
       logged, world record only). Tests: every present/missing/tampered combination of the three.
+      The record also carries the `WorldSettings` snapshot (name → value strings, so common never
+      touches the game-rule API) and a pure `WorldSettings.reverts(committed, current)` planner. Tests:
+      one changed rule → exactly one revert; an unknown new rule (a mod added it) → no revert.
 - [ ] B.4 `LockState` + `UnlockTimer` with an injected `TrustedClock`: uncommitted → committed →
       pending(requestedAt) → lifted, and cancel. Tests: 23:59:59 locked and 24:00:00 lifted;
       system clock +48 h with internet time +1 h → locked; no internet time → can't start and
@@ -333,6 +369,13 @@ place. Clock tests use the injected clock.
 - [ ] C.5 Dev-server smokes `commit-flow.txt` and `locked-boot.txt` on each loader, and Proof 4
       on a vanilla server. Revert checks: comment out the gate and watch `locked-boot` go red;
       remove the heartbeat and watch the "no effect" GameTest go red; restore both. Record here.
+- [ ] C.6 World settings, reverted live (owner, session 3). Facts first from each node's jar: how
+      game rules are enumerated and set (26.x registry-based rules), where `/difficulty`, the
+      difficulty button and Open to LAN's cheats toggle write, and whether hardcore can be set back.
+      Then: snapshot at `/commit confirm`, a revert check every 20 ticks and at server start, and the
+      message. Server GameTests: `/gamerule` and `/difficulty` each put back within 20 ticks, with the
+      message; an uncommitted world left alone. `scripts/checks/rules-revert.txt` on each loader
+      (`@expect Commitment: difficulty is locked`).
 
 ### Stage D: tamper matrix (disposable world copies only)
 

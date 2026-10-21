@@ -250,3 +250,21 @@ suspects while the scaffold goes in. A Loom bump is a separate, revertible step.
 **Rejected:** Loom 1.19.2 on day one (unproven here, and it may need a newer Gradle). A per-version guard pack
 (not needed: the codec is the same on every node).
 **Affects:** TODO.md Stage 0, gradle.properties, settings.gradle (Stage A)
+
+## 2026-10-21 — Commitment: world game settings are locked and reverted live; all of `server.properties` is locked
+**Context:** Asked at the start of Stage B whether the lock should cover the world's own settings, and
+`server.properties` on a dedicated server. Owner: lock difficulty, game rules, cheats and default
+gamemode; lock the whole `server.properties`. Those settings live in `level.dat`, which Commitment
+doesn't write, so "refuse the world open" would trap a player who ran `/difficulty hard` once: they'd
+need an NBT editor or the 24 h timer to undo it.
+**Choice:** Owner picked "revert live": while committed, the mod puts the committed value back through
+vanilla's API every 20 ticks and at server start, and says so in chat. The settings are a separate
+`WorldSettings` snapshot in the lock record, not manifest entries, because they're enforced differently.
+`server.properties` goes in the manifest one key per property, hashed, so the diff can name the key
+without printing `rcon.password`.
+**Why:** One periodic check catches every entry point (commands, the Options button, LAN cheats, other
+mods) with one hook, and nothing ever sends the player into the timer for a change they can't undo.
+**Rejected:** Refusing at world open (the trap above). Blocking each command and button (a hook per
+entry point per loader, and it misses other mods). Hashing `server.properties` as one file (the diff
+couldn't say what changed).
+**Affects:** TODO.md (spec, threat model, B.1, B.3, C.6), the future `common` WorldSettings and scanner

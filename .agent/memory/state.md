@@ -11,11 +11,13 @@
 **Commitment**: locks a world's setup after `/commit`, with a 24-hour unlock. Plan in `TODO.md` (Tier 2).
 - **Stage 0 done:** the guard datapack is GO on every 26.x node (facts in TODO.md 0.1–0.4).
 - **Stage A done:** scaffold of common + fabric/neoforge/forge × Stonecutter nodes 26.1.2/26.2/26.3. Build green,
-  boot smoke exit 0 on all 9, client world check PASS on all 3 Fabric nodes. No mod logic yet.
+  boot smoke exit 0 on all 9, client world check PASS on all 3 Fabric nodes.
+- **Owner rulings, session 3:** world game settings (difficulty, game rules, cheats, default gamemode) are locked and
+  **reverted live** (new step C.6); on a dedicated server the whole `server.properties` is locked (decisions.md).
+- **B.1 done:** `common/.../manifest/` scanner, 84 common tests per node, every guard mutation-checked.
 
 ## Next
-1. **Stage B.1:** `Manifest` + `ManifestScanner` in `common`, JUnit first. The data model is already written in
-   TODO.md B.1. Then B.2–B.6, one commit each.
+1. **B.2** `ManifestDiff` → readable lines, capped. Then B.3–B.6, one commit each; push when Stage B is green.
 2. Stage C needs a real-server smoke tool (copy `../the-continent/tools/server_smoke.py`) for Proof 4 (vanilla
    server, guard pack only) and Proof 7 (Quilt + built jars).
 
