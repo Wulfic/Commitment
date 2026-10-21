@@ -338,7 +338,7 @@ place. Clock tests use the injected clock.
       line shows a hash or a value. ASCII `->` (a Windows server console mangles `→`). `./gradlew build` exit 0 on
       all 12 nodes: common 111 tests per node (27 new), fabric 10, "All 2 required tests passed" ×3. Mutations:
       cap off by one → 2 red; ordering removed → 1 red; both restored and `cmp`-verified.
-- [x] B.3 `LockRecord` (NBT, HMAC-signed) + `LockStore`: world record, OS mirror, and the
+- [x] B.3 `LockRecord` (own gzip format, HMAC-signed; not NBT, see below) + `LockStore`: world record, OS mirror, and the
       reconciliation rules (one valid copy restores the rest; tampered or missing while the guard
       pack exists → locked, and only the timer gets out; a mirror dir that can't be written →
       logged, world record only). Tests: every present/missing/tampered combination of the three.
@@ -368,10 +368,15 @@ place. Clock tests use the injected clock.
       mirror dir, a world record that can't be read). Mutations, each 1 red and restored (`cmp`-verified): HMAC
       check off; another lock's record accepted; the guard pack not counted as evidence; mirror matched by
       folder alone; a misnamed mirror trusted.
-- [ ] B.4 `LockState` + `UnlockTimer` with an injected `TrustedClock`: uncommitted → committed →
+- [x] B.4 `LockState` + `UnlockTimer` with an injected `TrustedClock`: uncommitted → committed →
       pending(requestedAt) → lifted, and cancel. Tests: 23:59:59 locked and 24:00:00 lifted;
       system clock +48 h with internet time +1 h → locked; no internet time → can't start and
       can't finish, with the message.
+      **Done 2026-10-21:** `TrustedClock` (a reading or the reason there isn't one) and `UnlockTimer` (`start`,
+      `cancel`, `status` → Locked / Pending / Unverified / Lifted, and the player-facing messages). Uncommitted vs
+      committed is `LockStore.Loaded` (B.3), so no separate `LockState` class. `status` reads the clock only while
+      a timer runs. Common 168 tests per node (14 new). Mutations: boundary `>=` → `>` gives 3 red; an
+      unreachable clock read as "lifted" gives 1 red; both restored and `cmp`-verified.
 - [ ] B.5 `TrustedTime`: HTTPS `Date` headers from 2+ hosts that must agree within 5 min, short
       timeouts, every failure logged. Queried only at `/unlock confirm` and at world open while a
       timer runs. Tests against a local stub server. README privacy note.

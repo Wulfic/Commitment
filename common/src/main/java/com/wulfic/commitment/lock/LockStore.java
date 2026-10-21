@@ -212,8 +212,8 @@ public final class LockStore {
 
 	private static String describe(Copy copy) {
 		return switch (copy) {
-			case Copy.Missing m -> "missing";
-			case Copy.Valid v -> "valid";
+			case Copy.Missing _ -> "missing";
+			case Copy.Valid _ -> "valid";
 			case Copy.Tampered t -> "damaged: " + t.reason();
 		};
 	}
