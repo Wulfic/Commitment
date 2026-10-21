@@ -268,3 +268,14 @@ mods) with one hook, and nothing ever sends the player into the timer for a chan
 entry point per loader, and it misses other mods). Hashing `server.properties` as one file (the diff
 couldn't say what changed).
 **Affects:** TODO.md (spec, threat model, B.1, B.3, C.6), the future `common` WorldSettings and scanner
+
+## 2026-10-21 — Commitment: the lock record is its own gzip+HMAC binary format, not NBT
+**Context:** The plan said "LockRecord (NBT, HMAC-signed)". `common` compiles once per 26.x node, and the
+NBT API (`CompoundTag` getters, `NbtIo` signatures) has moved between recent Minecraft releases.
+**Choice:** A JDK-only format: gzip of a `CMTLOCK` magic, a format version, the fields, and an
+HMAC-SHA256 trailer. The magic doubles as the marker B.6's delete guard checks.
+**Why:** It compiles the same on every node with no `//? if` blocks, tests without bootstrapping
+Minecraft, and gzip makes it no more inviting to hand-edit than NBT. The HMAC is what catches edits.
+**Rejected:** NBT via `NbtIo` (per-node API drift for no gain: nothing vanilla reads this file). Plain
+JSON (invites editing, and an edit fails the HMAC anyway, which sends the player into the timer).
+**Affects:** TODO.md B.3, the future `common/.../lock/`

@@ -332,7 +332,12 @@ place. Clock tests use the injected clock.
       Commitment/java locked → 3 red; guard pack scanned → 2 red; config hashed raw → 6 red; server.properties
       read on a client → 2 red; the outside-`resourcepacks/` check off → 1 red. Rung 3 doesn't apply yet:
       nothing calls the scanner until C.2, which carries the dev-server proof.
-- [ ] B.2 `ManifestDiff` → readable lines, capped. Test the cap and the order.
+- [x] B.2 `ManifestDiff` → readable lines, capped. Test the cap and the order.
+      **Done 2026-10-21:** `ManifestDiff.lines(max)`: Minecraft, loader, mods, resource packs, datapacks, config,
+      server.properties, then key order; never more than `max` lines, the last one "...and K more changes". No
+      line shows a hash or a value. ASCII `->` (a Windows server console mangles `→`). `./gradlew build` exit 0 on
+      all 12 nodes: common 111 tests per node (27 new), fabric 10, "All 2 required tests passed" ×3. Mutations:
+      cap off by one → 2 red; ordering removed → 1 red; both restored and `cmp`-verified.
 - [ ] B.3 `LockRecord` (NBT, HMAC-signed) + `LockStore`: world record, OS mirror, and the
       reconciliation rules (one valid copy restores the rest; tampered or missing while the guard
       pack exists → locked, and only the timer gets out; a mirror dir that can't be written →
@@ -340,6 +345,21 @@ place. Clock tests use the injected clock.
       The record also carries the `WorldSettings` snapshot (name → value strings, so common never
       touches the game-rule API) and a pure `WorldSettings.reverts(committed, current)` planner. Tests:
       one changed rule → exactly one revert; an unknown new rule (a mod added it) → no revert.
+      **Design (written before code, 2026-10-21):** the record is Commitment's own format, not NBT
+      (decisions.md 2026-10-21): gzip of magic `CMTLOCK`, format version, lock id (UUID), revision
+      (long, +1 on every write), seed and world folder name (to find the mirror when the world's copy is
+      gone), committedAt, unlock requestedAt (internet time, or none), tampered flag, the manifest map and
+      the world-settings map, then HMAC-SHA256 over all of it with key = SHA-256(jar constant ‖ lock id).
+      `LockStore.load(worldDir, mirrorDir, guardLockId, seed, folder)` reads both copies, each as
+      missing / valid / tampered (bad magic, bad MAC, truncated), and decides: both missing and no guard
+      pack → **uncommitted**; one valid → that one, and the other copy is rewritten from it; both valid →
+      the higher revision wins and the other is rewritten; none valid but a tampered copy or the guard
+      pack exists → **tampered**: a fresh record with `tampered=true`, an empty manifest and no timer is
+      written to both, so the world stays locked and only the 24 h timer gets out. A mirror dir that
+      can't be written → logged, world record only. The mirror is found by lock id (from the world
+      record or the guard pack), else by scanning the mirror dir for seed + folder name. Tests: every
+      missing/valid/tampered combination × guard pack present/absent; a flipped byte → tampered; a
+      record from another lock id copied in → tampered; revision order; unwritable mirror → world only.
 - [ ] B.4 `LockState` + `UnlockTimer` with an injected `TrustedClock`: uncommitted → committed →
       pending(requestedAt) → lifted, and cancel. Tests: 23:59:59 locked and 24:00:00 lifted;
       system clock +48 h with internet time +1 h → locked; no internet time → can't start and
