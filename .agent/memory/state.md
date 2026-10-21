@@ -4,7 +4,7 @@
 > cheap to read at the start of every session. History belongs in `decisions.md` and
 > `gotchas.md`; this file only answers "where am I right now?".
 
-**Last updated:** 2026-10-21
+**Last updated:** 2026-10-21 (session 4)
 **Branch:** `main`, always (decisions.md 2026-10-21). Push each green stage (owner, 2026-10-21).
 
 ## Where we are
@@ -14,17 +14,19 @@
   boot smoke exit 0 on all 9, client world check PASS on all 3 Fabric nodes.
 - **Owner rulings, session 3:** world game settings (difficulty, game rules, cheats, default gamemode) are locked and
   **reverted live** (new step C.6); on a dedicated server the whole `server.properties` is locked (decisions.md).
-- **B.1–B.5 done** (commits d65ec16, b43f1b2, b65d620, c14c2bb, then B.5): scanner, diff lines, signed lock record +
-  mirror + reconciliation, 24 h timer, internet time (`InternetTime`: google/cloudflare/microsoft, 2 of 3 within
-  5 min, `HttpURLConnection`). Common has 179 tests per node; every guard was mutation-checked. **Not pushed yet**:
-  the owner's rule is to push each green stage, and Stage B ends at B.6.
+- **Stage B done** (B.1–B.6): scanner, diff lines, signed lock record + mirror + reconciliation, 24 h timer,
+  internet time, and B.6's `GuardPack` (generator, marker, a writer that never overwrites a stranger) and `LockLifter`
+  (all-or-nothing, **renames** to `*.<lockId>.lifted`: owner, session 4). Common 207 tests per node, every guard
+  mutation-checked. The guard pack is proven live on Fabric 26.1.2/26.2/26.3 (`scripts/guard-pack-smoke.sh`).
 
 ## Next
-1. **B.6** `GuardPack` generator + the lift-lock deleter (the destructive path: use `guard-destructive`).
-   `LockCodec.isOurs(bytes, lockId)` is the marker check for records. Then push Stage B.
-2. Stage C: the gate must pass `LockStore.load` the seed (read-only from level.dat) and the guard pack's lock id.
-   `InternetTime.read()` blocks for up to ~9 s, so it can't run on the render thread at world open.
-2. Stage C needs a real-server smoke tool (copy `../the-continent/tools/server_smoke.py`) for Proof 4 (vanilla
+1. Push Stage B (owner: push each green stage; no CI here, so a push can't release).
+2. **Stage C** (owner, session 4: carry on into it; game windows are OK, one at a time). Write C's design into
+   TODO.md first. Mixins can live in common (`org.spongepowered` isn't a loader API to LoaderFreeTest); Forge names
+   mixin configs in the jar manifest plus `--mixin.config` dev args (../enchanting-2/build.forge.gradle).
+   The gate passes `LockStore.load` the seed (read-only from level.dat) and `GuardPack.read(world)`.
+   `InternetTime.read()` blocks for up to ~9 s: never on the render thread.
+3. Stage C needs a real-server smoke tool (copy `../the-continent/tools/server_smoke.py`) for Proof 4 (vanilla
    server, guard pack only) and Proof 7 (Quilt + built jars).
 
 ## How to run things

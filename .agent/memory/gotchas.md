@@ -130,3 +130,23 @@ It now keys on any log4j line, with a self-test case for each.
 **Fix:** `net.minecraftforge.versions.forge.ForgeVersion.getVersion()` for Forge's version;
 `context.getContainer()` for our own.
 **Affects:** forge/src/main/java/com/wulfic/commitment/CommitmentForge.java
+
+## 2026-10-21 — Java doesn't call a Windows junction a symbolic link; and this machine can't make symlinks
+**Symptom:** Writing B.6's "a path that resolves outside the world is refused" test: `Files.createSymbolicLink` fails
+with "A required privilege is not held by the client" (no Developer Mode), so the test had no link to feed the guard.
+**Cause:** Windows symlinks need a privilege; directory junctions (`mklink /J`) don't. And for a junction, Java says
+`Files.isSymbolicLink` = **false** (`isOther` = true), so a guard that only checks `isSymbolicLink` /
+`isRegularFile(NOFOLLOW_LINKS)` on the file lets a junction in a *parent* folder walk straight out of the world.
+**Fix:** `LockLifter.check` compares `file.toRealPath()` with `root.toRealPath().resolve(root.relativize(file))`, which
+catches a link or junction anywhere on the path. `LockLifterTest.link` makes a symlink, or on Windows without the
+privilege a junction (`cmd /c mklink /J`); it fails rather than skips if neither works.
+**Dead ends:** `Files.isSymbolicLink` on each component (misses junctions).
+**Affects:** common/.../lock/LockLifter.java, LockLifterTest.java
+
+## 2026-10-21 — `core.autocrlf=true` here: byte-compared fixtures need `eol=lf` in `.gitattributes`
+**Symptom:** None yet; caught before the first commit of the guard pack's golden files.
+**Cause:** The owner's git converts text to CRLF on checkout, and `GuardPackTest` compares the golden files with the
+generator's LF text, so a fresh clone on Windows would go red.
+**Fix:** `common/src/test/resources/guard-pack/** text eol=lf` in `.gitattributes`. Do the same for any new fixture
+that's compared byte for byte.
+**Affects:** .gitattributes, common/src/test/resources/guard-pack/

@@ -9,3 +9,5 @@
 # These are Windows script files and should use crlf
 *.bat           text eol=crlf
 
+# The guard pack's golden files are compared byte for byte with what the mod writes (LF)
+common/src/test/resources/guard-pack/** text eol=lf

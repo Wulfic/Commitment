@@ -244,7 +244,7 @@ public final class LockStore {
 	}
 
 	/** Write beside, then move over, so a crash mid-write leaves the old record rather than half a new one. */
-	private static void writeAtomically(Path file, byte[] bytes) throws IOException {
+	static void writeAtomically(Path file, byte[] bytes) throws IOException {
 		Files.createDirectories(file.getParent());
 		Path tmp = file.resolveSibling(file.getFileName() + ".tmp");
 		Files.write(tmp, bytes);

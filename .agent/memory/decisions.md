@@ -279,3 +279,17 @@ Minecraft, and gzip makes it no more inviting to hand-edit than NBT. The HMAC is
 **Rejected:** NBT via `NbtIo` (per-node API drift for no gain: nothing vanilla reads this file). Plain
 JSON (invites editing, and an edit fails the HMAC anyway, which sends the player into the timer).
 **Affects:** TODO.md B.3, the future `common/.../lock/`
+
+## 2026-10-21 — Commitment: the lock lifts all-or-nothing, by renaming its files to `*.lifted`
+**Context:** B.6, the one destructive path: after the 24 h unlock, Commitment removes its record, mirror and
+guard pack. Asked the owner what happens when one file fails a guard, and whether AGENTS.md's soft-delete rule
+or their "no disk on backups" ruling wins.
+**Choice:** Owner: all-or-nothing (any refused file → nothing touched, the world stays locked, the log names
+the file), and rename to `<name>.<lockId>.lifted` (the mirror: `<lockId>.dat.lifted`) instead of deleting.
+**Why:** A half-lifted lock is worse than none: a guard pack left behind is evidence to `LockStore.load`, which
+would re-lock the world as tampered. Renaming keeps a hand-undoable copy of a buggy lift for a few KB; vanilla
+only loads `*.zip` packs (PackDetector), so the renamed pack is inert. The lock id in the name means a later
+commit's lift never collides with an earlier one's leftovers.
+**Rejected:** Per-file deletion (the re-lock above). Hard delete (owner preferred the soft delete; the rename
+also gives the failed-midway rollback something to move back).
+**Affects:** common/.../lock/LockLifter.java, GuardPack.java, TODO.md B.6

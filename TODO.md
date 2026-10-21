@@ -380,11 +380,66 @@ place. Clock tests use the injected clock.
 - [x] B.5 `TrustedTime`: HTTPS `Date` headers from 2+ hosts that must agree within 5 min, short
       timeouts, every failure logged. Queried only at `/unlock confirm` and at world open while a
       timer runs. Tests against a local stub server. README privacy note.
-- [ ] B.6 `GuardPack` generator + the lift-lock deleter (**the destructive path**): golden-file
+      **Done 2026-10-21** (commit 7ed0324): `InternetTime`: google/cloudflare/microsoft, 2 of 3 within 5 min,
+      `HttpURLConnection`. Common 179 tests per node.
+- [x] B.6 `GuardPack` generator + the lift-lock deleter (**the destructive path**): golden-file
       test of the generated pack; deletes only files inside the world or mirror dir that carry
       the marker and this lock id. Tests: a look-alike pack without the marker → refused, still on
       disk; a path that resolves outside → refused; a wrong lock id → refused. Mutation-check each
       guard.
+      **Owner rulings, session 4 (2026-10-21):** the lift is **all-or-nothing**: if any existing file fails a
+      guard, nothing is touched, the world stays locked, and the log names the file. And the lift **renames**
+      instead of deleting (soft delete): `data/commitment.dat` → `data/commitment.dat.<lockId>.lifted`,
+      `datapacks/commitment_guard.zip` → `datapacks/commitment_guard.zip.<lockId>.lifted`, mirror `<lockId>.dat`
+      → `<lockId>.dat.lifted`. Fact (PackDetector, all four jars): a regular file loads as a pack only if its
+      name ends in `.zip`, so the renamed pack is inert; `LockStore` reads only the exact names, so the renamed
+      records are too.
+      **Design (written before code):**
+      - Pack facts from the jars (26.1, 26.1.2, 26.2, 26.3, identical): tags in `data/minecraft/tags/function/`,
+        functions in `data/<ns>/function/`; `effect give <targets> <effect> <seconds> <0..255> <hideParticles>`;
+        `blindness`, `slowness`, `mining_fatigue`, `resistance`; `title … times|title|subtitle`;
+        `schedule function <id> <time> replace`. Text components parse as SNBT, so `{"text":…}` works.
+      - `GuardPack` (common `lock/`): `files(lockId)` → the entries; `build(lockId)` → a deterministic zip (sorted
+        entries, fixed local timestamp). Entries: `pack.mcmeta` (`min_format` 101, `max_format` 121),
+        `commitment.lock` (marker line `marker=CMTGUARD 1` and `lock=<uuid>`), the `#minecraft:load` tag, and
+        functions in namespace `commitment_guard`: `load` (clears `alive` and `warned` in storage
+        `commitment:guard`, schedules `check` in 40t), `check` (no `alive` → `penalty`; then clears `alive` and
+        reschedules 40t), `penalty` (`say Commitment guard: Commitment is missing` once per load, then the four
+        3 s effects with hidden particles and the title). `lockIdOf(bytes)` reads only the marker entry, capped;
+        `read(worldDir)` → the lock id for `LockStore.load` (missing → empty, not ours → empty + warn, unreadable →
+        IOException: fail closed); `write(worldDir, lockId)` → wrote / unchanged / **refused** when the file there
+        isn't ours or is another lock's (never overwrites a file it can't prove is its own).
+      - `LockLifter`: `plan(worldDir, mirrorFile, lockId)` is the dry run: for each of the three targets, Missing,
+        Ours (→ its `.lifted` name) or Refused (reason). Refused when: the real path of the file isn't directly in the
+        real path of its root (junctions and symlinks; Java says a junction is *not* a symbolic link, so the check
+        is on real paths), it's not a regular file, it's over the size cap, it lacks the marker or carries another
+        lock id, or the `.lifted` name is taken. `lift(plan)` runs only an allowed plan, re-checks each file just
+        before moving it, renames guard → mirror → world record (the world record last, so a crash leaves a
+        record that retries the lift), and on a failed rename moves the earlier ones back. Logs before (each
+        path) and after (count, and the undo: rename back). A null lock id or world dir throws.
+      - Tests: golden files in `common/src/test/resources/guard-pack/` (fixed test lock id) == `files()`; a
+        look-alike pack, a record of another lock, a guard of another lock, a junction out of the world, a taken
+        `.lifted` name → refused and **every file still on disk, unrenamed**; a rename that fails midway → the
+        earlier renames undone; the renamed pack is ignored by `read`, the renamed records by `LockStore.load`.
+      - Live proof (rung 3, it's a data file): `scripts/guard-pack-smoke.sh` zips the golden files into
+        `run/<loader>/<node>/server/world/datapacks/`, boots the dev server with `scripts/checks/guard-pack.txt`
+        (`@expect Found new data pack file/commitment_guard.zip`, `@expect Commitment guard: Commitment is
+        missing`: there's no heartbeat until C.1, so the guard must fire), then removes the zip it wrote. All
+        three nodes on Fabric.
+      **Done 2026-10-21:** `GuardPack`, `LockLifter`, golden files, `scripts/guard-pack-smoke.sh` +
+      `scripts/checks/guard-pack.txt`. `./gradlew build` exit 0 on all 12 nodes; counts from the XML: common **207** per
+      node (28 new: 12 `GuardPackTest`, 16 `LockLifterTest`), fabric 10, 0 failed, 0 skipped; "All 2 required tests passed"
+      on all three Fabric nodes. **Mutations** (`common:26.3` lock tests, each restored and `cmp`-verified): containment off,
+      ownership off, a guard pack of any lock, a taken `.lifted` name, all-or-nothing off, undo off, re-check off,
+      regular-file check off, size cap off, writer over another lock's pack, writer over a look-alike, non-canonical uuid,
+      marker line not required, marker cap off, second `lock=` wins, a generated function changed: **16 of 16 red**. A
+      duplicate-marker-entry check was removed rather than kept untested (`ZipOutputStream` can't write one).
+      **Rung 3:** `LOADER=fabric NODE=<n> bash scripts/guard-pack-smoke.sh` **exit 0 on 26.3, 26.2, 26.1.2**, matching
+      `There are 4 data pack(s) enabled: … [file/commitment_guard.zip (world)]` and `[Server] Commitment guard: Commitment
+      is missing` (once per run, no function WARN or ERROR); the zip removed afterwards. **Revert check:** `say` → `sya` in
+      the golden penalty: exit 1, `Failed to load function commitment_guard:penalty` (ERROR) and no guard line; restored,
+      `cmp`-verified. "Found new data pack" was dropped from the check: vanilla logs it only the first time a world sees
+      the pack.
 
 ### Stage C: hooks, per node and loader (commit per step)
 
