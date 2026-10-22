@@ -99,7 +99,9 @@ neoForge {
 				loadedMods = [mods.commitment]
 			}
 			// Development writes its lock mirrors here, never into the developer's own user data dir (MirrorDir.OVERRIDE).
-			systemProperty 'commitment.mirrorDir', new File(runRoot, "mirror").absolutePath
+			// The GameTest server's go in its own run dir, cleared by every run (clearGameTestRunDir).
+			systemProperty 'commitment.mirrorDir', (name == 'gameTest' ? layout.buildDirectory.dir('run/gameTest/mirror').get().asFile
+					: new File(runRoot, "mirror")).absolutePath
 			// `-Pcommitment.unlock=start` (dev-server-smoke.sh's @gradle): the dedicated server's unlock flag (ServerGate).
 			if (providers.gradleProperty('commitment.unlock').isPresent()) {
 				systemProperty 'commitment.unlock', providers.gradleProperty('commitment.unlock').get()
@@ -135,7 +137,7 @@ dependencies {
 	serverGameTestJava project(path: ":fabric:${stonecutter.current.project}", configuration: 'serverGameTestJava')
 }
 
-// A fresh GameTest world every run, as Loom gives Fabric's. Only <node>/build/run/gameTest is ever deleted: it's
+// A fresh GameTest world every run (Fabric's clearGameTestWorld does the same). Only <node>/build/run/gameTest is ever deleted: it's
 // rebuilt from nothing by every run, so nothing in it is anyone's.
 def buildRoot = layout.buildDirectory.get().asFile.canonicalFile
 def gameTestRunDir = new File(buildRoot, 'run/gameTest').canonicalFile

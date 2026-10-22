@@ -7,7 +7,8 @@
 	"entrypoints": {
 		"fabric-gametest": [
 			"com.wulfic.commitment.gametest.CommitmentGameTest",
-			"com.wulfic.commitment.gametest.GuardGameTest"
+			"com.wulfic.commitment.gametest.GuardGameTest",
+			"com.wulfic.commitment.gametest.CommandsGameTest"
 		],
 		"fabric-client-gametest": [
 			"com.wulfic.commitment.gametest.CommitmentClientGameTest",

@@ -227,3 +227,15 @@ Reading a mutation result through a layer whose output can't be seen is how "0 r
 **Fix:** Python only edits files (asserting each edit applied); Gradle runs from a Git Bash loop that writes each run's
 log to a file, and the verdict is grepped from that log.
 **Affects:** any mutation-check script
+
+## 2026-10-22 — Loom does NOT wipe the Fabric GameTest world between runs
+**Symptom:** CommandsGameTest passed once, then failed on the next run with "this world is committed" at its first
+step, and a lock mirror deleted by hand came back: the server rebuilt it from the world's record at start.
+**Cause:** `<node>/build/run/gameTest` (eula.txt, mods/, world/) persists across `runGameTest` runs; it had been there
+since Oct 21. fabric/build.gradle and neoforge/build.gradle both said Loom wipes it. Nothing committed the GameTest
+world before C.3, so the stale claim never showed.
+**Fix:** a guarded `clearGameTestWorld` on Fabric (only `build/run/gameTest/world` and `.../mirror`, fail closed;
+mutation: another path → "Refusing to delete") before `runGameTest`, and every loader's GameTest server writes its
+lock mirrors into its own wiped run dir instead of the shared `run/<loader>/<node>/mirror`, so a test that fails
+midway can't leave a mirror the dev-server smokes then refuse to run over.
+**Affects:** fabric/build.gradle, neoforge/build.gradle, forge/build.gradle, CommandsGameTest

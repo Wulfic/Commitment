@@ -88,7 +88,7 @@ tasks.named('runServer') {
 
 fabricApi {
 	// Adds the `gametest` source set and `runGameTest`, which `check` runs on a headless server
-	// in fabric/build/run/gameTest. Loom wipes that directory before every run.
+	// in <node>/build/run/gameTest. Loom keeps that directory and its world between runs: clearGameTestWorld, below.
 	// `runClientGameTest` plays a singleplayer world on a real client. It needs a display, so
 	// `check` leaves it out.
 	configureTests {
@@ -98,6 +98,37 @@ fabricApi {
 		enableClientGameTests = true
 		eula = true // Accepts the Minecraft EULA for the automated test server only.
 	}
+}
+
+// A fresh GameTest world every run. Loom keeps the last run's (gotchas.md 2026-10-22), and CommandsGameTest commits
+// it, which every later run would then inherit. Only <node>/build/run/gameTest/world and .../mirror (the GameTest
+// server's lock mirrors, below) are ever deleted: each run creates them from nothing, so nothing in them is anyone's.
+// eula.txt and mods/ beside them are Loom's, kept.
+def buildRoot = layout.buildDirectory.get().asFile.canonicalFile
+def gameTestState = ['world', 'mirror'].collect { new File(buildRoot, "run/gameTest/${it}").canonicalFile }
+def clearGameTestWorld = tasks.register('clearGameTestWorld') {
+	doLast {
+		gameTestState.each { dir ->
+			// Fail closed: a path that resolves anywhere else (a junction, a changed build dir) is refused.
+			if (dir.parentFile != new File(buildRoot, 'run/gameTest').canonicalFile || !(dir.name in ['world', 'mirror'])) {
+				throw new GradleException("Refusing to delete ${dir}: not ${buildRoot}/run/gameTest/world or mirror")
+			}
+			if (dir.exists()) {
+				logger.lifecycle("Clearing the GameTest ${dir.name} ${dir} (rebuilt by every run)")
+				if (!dir.deleteDir()) {
+					throw new GradleException("Could not clear ${dir}; a server from the last run may still hold it")
+				}
+			}
+		}
+	}
+}
+tasks.matching { it.name == 'runGameTest' }.configureEach {
+	dependsOn clearGameTestWorld
+}
+// The GameTest server keeps its lock mirrors beside its world, cleared with it: a test that fails midway never leaves
+// one in run/fabric/<node>/mirror, where the dev-server smokes refuse to run over a leftover.
+loom.runs.matching { it.name == 'gameTest' }.configureEach {
+	property 'commitment.mirrorDir', new File(buildRoot, 'run/gameTest/mirror').absolutePath
 }
 
 // The server GameTests as Stonecutter wrote them for this node, for NeoForge's and Forge's GameTest mods of the same

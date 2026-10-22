@@ -96,6 +96,14 @@ public final class CommitmentServer {
 		}
 	}
 
+	/**
+	 * Whether this server sets the heartbeat every tick. Asking the storage instead is a race: the guard pack's own
+	 * functions clear {@code alive} at load and every 40 ticks, and the heartbeat sets it again at the tick's end.
+	 */
+	public static boolean beating(MinecraftServer server) {
+		return BEATING.containsKey(server);
+	}
+
 	/** Starts the heartbeat for a world committed while the server runs ({@code /commit confirm}). */
 	public static void beat(MinecraftServer server) {
 		BEATING.put(server, true);

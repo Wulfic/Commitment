@@ -2,9 +2,11 @@ package com.wulfic.commitment;
 
 import static com.wulfic.commitment.Commitment.MOD_ID;
 
+import com.wulfic.commitment.command.CommitmentCommands;
 import com.wulfic.commitment.platform.Platform;
 import com.wulfic.commitment.server.CommitmentServer;
 import net.fabricmc.api.ModInitializer;
+import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.loader.api.FabricLoader;
@@ -23,6 +25,7 @@ public final class CommitmentFabric implements ModInitializer {
 		ServerLifecycleEvents.SERVER_STARTED.register(CommitmentServer::started);
 		ServerLifecycleEvents.SERVER_STOPPED.register(CommitmentServer::stopped);
 		ServerTickEvents.END_SERVER_TICK.register(CommitmentServer::tick);
+		CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> CommitmentCommands.register(dispatcher));
 		Commitment.logLoaded(version(loader, MOD_ID), platform.name(), platform.version());
 	}
 

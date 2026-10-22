@@ -804,6 +804,19 @@ NeoForge and Forge first** (step C.0), so Proof 2 runs on all nine loader × nod
       (`ClientGameDir`, `serverDir()`) are behaviour-identical; C.3c's smokes and client test run them live.
       `./gradlew build` exit 0 on 13 nodes: common **266** per node, fabric 12, GameTests 4 of ours on all ten, no javac
       warnings.
+      **C.3b done, session 7:** registration on Fabric (`CommandRegistrationCallback`), NeoForge
+      (`RegisterCommandsEvent` on `NeoForge.EVENT_BUS`) and Forge (`RegisterCommandsEvent.BUS`, read from the 64.1.5 /
+      65.1.5 / 66.1.0 jars). `CommandsGameTest` (one sequential test through `server.getCommands()` with a capturing
+      console): status, a confirm with nothing pending, `/commit`, `/commit confirm` (record, pack, mirror, heartbeat,
+      pack enabled at once), `/commit` again, `/unlock`, a confirm after 61 s (expired, nothing started), `/unlock
+      confirm` (timer at the test clock's time), `/unlock cancel`, and a gamemaster-level source refused.
+      `CommitmentServer.beating(server)`: asserting `alive` in storage is a race (the guard's own functions clear it).
+      **Found on the way (gotchas.md):** Loom keeps the Fabric GameTest world between runs, so the second run started
+      committed; a guarded `clearGameTestWorld` (mutation: another path → "Refusing to delete") and every loader's
+      GameTest server writes its mirrors into its own wiped run dir. **Mutations on `:fabric:26.3:runGameTest`, each red
+      and restored:** Fabric registration removed ("Unknown or incomplete command"); no heartbeat on commit; no
+      `select` on commit; anyone allowed. `./gradlew build` exit 0 on 13 nodes: GameTests **5 of ours and 1 others, 0
+      failed, on all ten**; common 266, fabric 12; shared mirror dirs empty after; no javac warnings.
       **Not doing in C.3:** world settings (C.6), the LockedScreen (C.4), `locked-boot` from a config change (C.5).
       **Blast radius:** `/commit confirm` writes Commitment's three files in dev worlds and `run/<l>/<n>/mirror` only;
       the smoke wrapper removes only files carrying the marker and the run's lock id, after its own refusal on leftovers.

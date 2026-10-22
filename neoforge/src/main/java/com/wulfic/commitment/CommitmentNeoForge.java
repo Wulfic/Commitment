@@ -2,6 +2,7 @@ package com.wulfic.commitment;
 
 import static com.wulfic.commitment.Commitment.MOD_ID;
 
+import com.wulfic.commitment.command.CommitmentCommands;
 import com.wulfic.commitment.manifest.GameEnvironment;
 import com.wulfic.commitment.platform.Platform;
 import com.wulfic.commitment.server.CommitmentServer;
@@ -14,6 +15,7 @@ import net.neoforged.fml.ModList;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.loading.FMLEnvironment;
 import net.neoforged.neoforge.common.NeoForge;
+import net.neoforged.neoforge.event.RegisterCommandsEvent;
 import net.neoforged.neoforge.event.server.ServerStartedEvent;
 import net.neoforged.neoforge.event.server.ServerStoppedEvent;
 import net.neoforged.neoforge.event.tick.ServerTickEvent;
@@ -30,6 +32,7 @@ public final class CommitmentNeoForge {
 		NeoForge.EVENT_BUS.addListener(ServerStartedEvent.class, event -> CommitmentServer.started(event.getServer()));
 		NeoForge.EVENT_BUS.addListener(ServerStoppedEvent.class, event -> CommitmentServer.stopped(event.getServer()));
 		NeoForge.EVENT_BUS.addListener(ServerTickEvent.Post.class, event -> CommitmentServer.tick(event.getServer()));
+		NeoForge.EVENT_BUS.addListener(RegisterCommandsEvent.class, event -> CommitmentCommands.register(event.getDispatcher()));
 		Commitment.logLoaded(container.getModInfo().getVersion().toString(), "NeoForge", neoforge);
 	}
 

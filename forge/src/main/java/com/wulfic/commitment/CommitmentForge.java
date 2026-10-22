@@ -2,6 +2,7 @@ package com.wulfic.commitment;
 
 import static com.wulfic.commitment.Commitment.MOD_ID;
 
+import com.wulfic.commitment.command.CommitmentCommands;
 import com.wulfic.commitment.manifest.GameEnvironment;
 import com.wulfic.commitment.platform.Platform;
 import com.wulfic.commitment.server.CommitmentServer;
@@ -9,6 +10,7 @@ import java.nio.file.FileSystems;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Set;
+import net.minecraftforge.event.RegisterCommandsEvent;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.event.server.ServerStartedEvent;
 import net.minecraftforge.event.server.ServerStoppedEvent;
@@ -27,6 +29,7 @@ public final class CommitmentForge {
 		ServerStartedEvent.BUS.addListener(event -> CommitmentServer.started(event.getServer()));
 		ServerStoppedEvent.BUS.addListener(event -> CommitmentServer.stopped(event.getServer()));
 		TickEvent.ServerTickEvent.Post.BUS.addListener(event -> CommitmentServer.tick(event.server()));
+		RegisterCommandsEvent.BUS.addListener(event -> CommitmentCommands.register(event.getDispatcher()));
 		Commitment.logLoaded(context.getContainer().getModInfo().getVersion().toString(), "Forge", ForgeVersion.getVersion());
 	}
 
