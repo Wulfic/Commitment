@@ -72,7 +72,7 @@ public final class ServerGate {
 		String world = env.worldDir().getFileName().toString();
 		List<String> lines = new ArrayList<>();
 		return switch (WorldGate.evaluate(env, store, clock)) {
-			case WorldGate.Verdict.Uncommitted _ -> {
+			case WorldGate.Verdict.Uncommitted() -> {
 				if (unlockFlag != null) {
 					lines.add("Commitment: -D" + UNLOCK_FLAG + "=" + unlockFlag + " ignored: " + world + " isn't committed");
 				}

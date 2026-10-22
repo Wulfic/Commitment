@@ -28,6 +28,8 @@ class ReadmeBandsTest {
 	private static final String SECTION = "## Supported versions";
 	/** A row that isn't a band of this build has to say it's a frozen line. */
 	private static final String FROZEN = "Frozen on branch";
+	/** The cell of a loader that has no jar for the band (no `<loader>_band_label.<band>` key): 1.21.11 is Fabric only. */
+	private static final String NO_JAR = "—";
 
 	private static Properties gradle;
 	/** The table's rows, keyed by the Minecraft cell without its bold markers. */
@@ -106,15 +108,20 @@ class ReadmeBandsTest {
 			assertNotNull(cells, "README has no row for band " + band);
 			assertEquals(4, cells.size(), "README row " + cells + " should have 4 cells: Minecraft, Fabric and Quilt, NeoForge, Forge");
 			assertJar(cells.get(1), "Fabric", property("band_label." + band));
-			assertJar(cells.get(2), "NeoForge", property("neoforge_band_label." + band));
-			assertJar(cells.get(3), "Forge", property("forge_band_label." + band));
+			assertJar(cells.get(2), "NeoForge", gradle.getProperty("neoforge_band_label." + band));
+			assertJar(cells.get(3), "Forge", gradle.getProperty("forge_band_label." + band));
 			for (String cell : cells) {
 				assertFalse(cell.contains("Planned"), "README row for band " + band + " still says Planned: " + cells);
 			}
 		}
 	}
 
+	/** @param label the band label of the loader's jar, or null when the build makes no jar of that loader for the band */
 	private static void assertJar(String cell, String loader, String label) {
+		if (label == null) {
+			assertEquals(NO_JAR, cell, "README's " + loader + " cell '" + cell + "' names a jar the build doesn't make");
+			return;
+		}
 		assertTrue(cell.equals("`mc" + label + "`") || cell.startsWith("`mc" + label + "`:"),
 				"README's " + loader + " cell '" + cell + "' should name the jar's band `mc" + label + "`");
 	}

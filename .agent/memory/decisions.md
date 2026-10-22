@@ -344,3 +344,15 @@ stray write, is the failure that matters, and only real packs show which files m
 **Rejected:** A scanner-only run on the 1.21.11 copy (doesn't exercise the mod). Retrofitting 1.21.11 after Stage C
 (every hook would have to be written twice).
 **Affects:** settings.gradle, gradle.properties, common + fabric nodes, README band statement, TODO C.2a/C.2b/E.1
+
+## 2026-10-22 — E.1 runs: a Loom dev client for the 1.21.11 copy, premade Modrinth packs for 26.x
+**Context:** E.1 runs Commitment on a copy of the owner's 82-mod 1.21.11 Prism instance and on a pack per 26.x node.
+Launching through Prism would mean writing into the owner's launcher (an absolute stop) and their account.
+**Choice:** Owner: copy the instance's mods, config and resource packs into `run/packs/1.21.11/` and launch through
+`:fabric:1.21.11:runClient` (offline dev account), so the three restarts are scripted. For 26.x: a premade Modrinth
+vanilla+ pack per node and loader where one exists, a small handmade pack where none does.
+**Why:** Scripted restarts need no one at the keyboard and never touch Prism. Real premade packs are where the "mods
+rewrite their own configs" signal comes from.
+**Rejected:** Owner importing a prepared instance into Prism (every restart needs them). Handmade packs only (less
+realistic).
+**Affects:** TODO E.1, run/packs/

@@ -55,12 +55,16 @@ public final class GuardPack {
 	private GuardPack() {
 	}
 
-	/** The pack's entries, path → text. Formats and command syntax read from every 26.x jar (plan steps 0.2 and B.6). */
+	/**
+	 * The pack's entries, path → text. Formats read from every node's jar (plan steps 0.2, B.6, C.2a): min_format 94 is
+	 * 1.21.11's data format, max_format 121 is 26.3's, and above 81 neither needs pack_format. The commands are proven
+	 * by the guard-pack smoke on each node.
+	 */
 	public static SortedMap<String, String> files(UUID lockId) {
 		Objects.requireNonNull(lockId, "lockId");
 		SortedMap<String, String> files = new TreeMap<>();
 		files.put("pack.mcmeta", """
-				{"pack":{"description":"Commitment guard: this world is committed","min_format":101,"max_format":121}}
+				{"pack":{"description":"Commitment guard: this world is committed","min_format":94,"max_format":121}}
 				""");
 		files.put(MARKER_ENTRY, """
 				# Written by the Commitment mod: this world is committed, and this pack guards it.

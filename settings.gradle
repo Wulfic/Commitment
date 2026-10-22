@@ -4,6 +4,13 @@ pluginManagement {
 			name = 'Fabric'
 			url = 'https://maven.fabricmc.net/'
 		}
+		// loom-back-compat (below). Releases only, never the snapshots repo, and only dev.kikugie from it. A content
+		// filter, not exclusiveContent: Gradle refuses buildscript repositories (below) next to exclusive content.
+		maven {
+			name = 'KikuGie Releases'
+			url = 'https://maven.kikugie.dev/releases'
+			content { includeGroupAndSubgroups 'dev.kikugie' }
+		}
 		mavenCentral()
 		gradlePluginPortal()
 	}
@@ -12,6 +19,22 @@ pluginManagement {
 plugins {
 	// Pinned 2026-10-20 from the Gradle Plugin Portal (0.9.8, 2026-08-31). Needs Gradle 9.0 or newer.
 	id 'dev.kikugie.stonecutter' version '0.9.8'
+	// Pinned 2026-10-22 from maven.kikugie.dev (0.4.3, the newest release; ../enchanting-2 builds on it). Applies
+	// fabric-loom-remap on an obfuscated Minecraft (1.21.11) and fabric-loom on 26.x, at loomx.loom_version.
+	id 'dev.kikugie.loom-back-compat' version '0.4.3'
+}
+
+// loom-back-compat adds Loom to every project's buildscript classpath (gradle.lifecycle.beforeProject, read from its
+// jar), and a buildscript classpath resolves from that project's own repositories, not pluginManagement's.
+gradle.lifecycle.beforeProject {
+	buildscript.repositories {
+		maven {
+			name = 'Fabric'
+			url = 'https://maven.fabricmc.net/'
+		}
+		mavenCentral()
+		gradlePluginPortal()
+	}
 }
 
 // Should match the mod id
@@ -24,11 +47,12 @@ stonecutter {
 	kotlinController = false
 	centralScript = 'build.gradle'
 	create(rootProject) {
+		// 1.21.11 is Fabric only (owner, decisions.md 2026-10-22): common builds it for the Fabric jar alone.
 		branch('common') {
-			versions '26.1.2', '26.2', '26.3'
+			versions '1.21.11', '26.1.2', '26.2', '26.3'
 		}
 		branch('fabric') {
-			versions '26.1.2', '26.2', '26.3'
+			versions '1.21.11', '26.1.2', '26.2', '26.3'
 		}
 		branch('neoforge') {
 			versions '26.1.2', '26.2', '26.3'

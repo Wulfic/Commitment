@@ -1,10 +1,14 @@
 plugins {
-	id 'net.fabricmc.fabric-loom'
+	// fabric-loom-remap on an obfuscated Minecraft (1.21.11), fabric-loom on 26.x (settings.gradle).
+	id 'dev.kikugie.loom-back-compat'
 }
 
 // This node's Minecraft band, and common's node for it.
 def band = stonecutter.current.version
 def common = ":common:${stonecutter.current.project}"
+// The node's Java release (gradle.properties java_version): 1.21.11 players run Java 21, so its class files must
+// load there. fabric.mod.json asks for the same.
+def javaRelease = project.property("java_version.$band") as int
 
 // Keeps `:fabric:26.2` a different module from `:common:26.2` (see common/build.gradle).
 group = "${project.group}.fabric"
@@ -113,8 +117,10 @@ apply from: rootProject.file('gradle/gametest-report.gradle')
 dependencies {
 	// The node's band is the Minecraft version; the rest is per band in gradle.properties.
 	minecraft "com.mojang:minecraft:${band}"
-	implementation "net.fabricmc:fabric-loader:${project.loader_version}"
-	implementation "net.fabricmc.fabric-api:fabric-api:${project.property("fabric_api_version.$band")}"
+	// Mojang names on an obfuscated Minecraft; 26.x needs none. mod* remaps there and is plain on 26.x.
+	loomx.applyMojangMappings()
+	modImplementation "net.fabricmc:fabric-loader:${project.loader_version}"
+	modImplementation "net.fabricmc.fabric-api:fabric-api:${project.property("fabric_api_version.$band")}"
 
 	// common's node for the same band. Compiled classes for IDEs only: the build compiles its sources, below.
 	compileOnly project(common)
@@ -137,11 +143,13 @@ processResources {
 	def minecraftRange = project.property("minecraft_range.$band")
 	inputs.property "version", version
 	inputs.property "minecraftRange", minecraftRange
+	def release = javaRelease
+	inputs.property "javaRelease", release
 
 	from configurations.commonResources
 
 	filesMatching("fabric.mod.json") {
-		expand "version": version, "minecraftRange": minecraftRange
+		expand "version": version, "minecraftRange": minecraftRange, "javaRelease": release
 	}
 }
 
@@ -155,14 +163,14 @@ tasks.named('processGametestResources', ProcessResources) {
 }
 
 tasks.withType(JavaCompile).configureEach {
-	it.options.release = 25
+	it.options.release = javaRelease
 }
 
 java {
 	withSourcesJar()
 
-	sourceCompatibility = JavaVersion.VERSION_25
-	targetCompatibility = JavaVersion.VERSION_25
+	sourceCompatibility = JavaVersion.toVersion(javaRelease)
+	targetCompatibility = JavaVersion.toVersion(javaRelease)
 }
 
 tasks.named('sourcesJar', Jar) {
@@ -182,7 +190,7 @@ test {
 	inputs.dir(rootProject.file("fabric/src/gametest")).withPropertyName("gameTestSources")
 		.withPathSensitivity(PathSensitivity.RELATIVE)
 	// BandLabelTest: the jar this node ships, and the Minecraft version it compiles against.
-	systemProperty "commitment.jarName", tasks.named('jar', Jar).get().archiveFileName.get()
+	systemProperty "commitment.jarName", loomx.modJar.get().archiveFileName.get()
 	systemProperty "commitment.minecraft", band
 	testLogging {
 		events = ["passed", "skipped", "failed"]

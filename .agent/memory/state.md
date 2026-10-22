@@ -4,36 +4,28 @@
 > cheap to read at the start of every session. History belongs in `decisions.md` and
 > `gotchas.md`; this file only answers "where am I right now?".
 
-**Last updated:** 2026-10-22 (session 6)
+**Last updated:** 2026-10-22 (session 7, C.2a done)
 **Branch:** `main`, always (decisions.md 2026-10-21). Push each green stage (owner, 2026-10-21).
 
 ## Where we are
 **Commitment**: locks a world's setup after `/commit`, with a 24-hour unlock. Plan in `TODO.md` (Tier 2).
-- **Stage 0 done:** the guard datapack is GO on every 26.x node (facts in TODO.md 0.1–0.4).
-- **Stage A done:** scaffold of common + fabric/neoforge/forge × Stonecutter nodes 26.1.2/26.2/26.3. Build green,
-  boot smoke exit 0 on all 9, client world check PASS on all 3 Fabric nodes.
-- **Owner rulings, session 3:** world game settings (difficulty, game rules, cheats, default gamemode) are locked and
-  **reverted live** (new step C.6); on a dedicated server the whole `server.properties` is locked (decisions.md).
-- **Stage B done** (B.1–B.6): scanner, diff lines, signed lock record + mirror + reconciliation, 24 h timer,
-  internet time, and B.6's `GuardPack` (generator, marker, a writer that never overwrites a stranger) and `LockLifter`
-  (all-or-nothing, **renames** to `*.<lockId>.lifted`: owner, session 4). Common 207 tests per node, every guard
-  mutation-checked. The guard pack is proven live on Fabric 26.1.2/26.2/26.3 (`scripts/guard-pack-smoke.sh`).
+- **Stages 0, A, B done.** Stage C: C.0, C.1, C.2 and **C.2a (Fabric 1.21.11 node)** committed, not pushed. 13 nodes:
+  common + fabric on 1.21.11/26.1.2/26.2/26.3, neoforge + forge on the three 26.x. Common 245 JUnit per node, fabric 12,
+  GameTests 4 of ours on all ten GameTest nodes.
+- Owner rulings in decisions.md: lift is all-or-nothing and renames to `*.<lockId>.lifted`; a locked dedicated server
+  unlocks with `-Dcommitment.unlock=start|cancel`; the dev mirror override works in development runs only; world game
+  settings are reverted live (C.6); E.1 runs the 1.21.11 copy as a Loom dev client, 26.x on premade Modrinth packs.
 
-## Next (session 6)
-- C.0, C.1 committed, not pushed. **C.2 done** (server + client gate, proven on all nine / all three Fabric nodes;
-  TODO C.2 "Done, session 6"). Push when Stage C is green (no CI: a push can't release).
-- **Owner, session 6:** add a **Fabric 1.21.11 node** (C.2a, next, before C.3) so Commitment runs live on a copy of the
-  owner's 82-mod Prism instance; **save safety** (C.2b); a test pack per 26.x node (E.1). decisions.md 2026-10-22.
-  C.2a facts are in TODO (Java 21, Fabric API 0.141.6, loom-back-compat 0.4.3 as ../enchanting-2); three facts still open.
-- C.1's guard-pack smokes refuse at the gate now (golden pack = damaged record): redo them in C.3 with `/commit`.
-- Owner rulings (decisions.md): lift is all-or-nothing and renames to `*.<lockId>.lifted`; a locked dedicated server
-  unlocks with `-Dcommitment.unlock=start|cancel`; the dev mirror override works in development runs only.
+## Next
+- **C.2b save safety**, then C.3 (`/commit`; redo C.1's guard-pack smokes with it: a golden-pack-only world is now
+  refused by the gate), C.4 LockedScreen, C.5, C.6. Push when Stage C is green (no CI: a push can't release).
 - Stage C still needs a real-server smoke tool (`../the-continent/tools/server_smoke.py`) for Proof 4 and 7.
+- Noted: "Deprecated Gradle features" comes from a task at execution time; find which before Gradle 10.
 
 ## How to run things
-- Build: `./gradlew build` (all 12 nodes; Fabric's `check` includes `runGameTest`). Read counts from
+- Build: `./gradlew build` (all 13 nodes with 1.21.11; Fabric's `check` includes `runGameTest`). Read counts from
   `*/versions/*/build/test-results/test/*.xml`, not the exit code.
-- Dev server: `LOADER=<fabric|neoforge|forge> NODE=<26.1.2|26.2|26.3> scripts/dev-server-smoke.sh scripts/checks/boot.txt`.
+- Dev server: `LOADER=<fabric|neoforge|forge> NODE=<1.21.11 (fabric only)|26.1.2|26.2|26.3> scripts/dev-server-smoke.sh scripts/checks/boot.txt`.
   Port **25571**, run dirs `run/<loader>/<node>/server`. `--self-test` checks the verdict (21 cases). `@reject` = must not match, `@exits-nonzero` = a refusal, `@gradle <arg>`.
 - Client check: `./gradlew :fabric:<node>:runClientGameTest` opens a game window; look for `client world check: PASS`
   and `client gate check: PASS`. Locked boots: `LOADER=.. NODE=.. bash scripts/guard-pack-smoke.sh scripts/checks/locked-{boot,unlock,cancel}.txt`.

@@ -61,7 +61,8 @@ public final class ClientGate {
 	private static void act(WorldOpenFlows flows, Minecraft minecraft, String levelId, Runnable onCancel, Path world,
 			WorldGate.Verdict verdict) {
 		switch (verdict) {
-			case WorldGate.Verdict.Uncommitted _, WorldGate.Verdict.Open _ -> open(flows, levelId, onCancel);
+			case WorldGate.Verdict.Uncommitted() -> open(flows, levelId, onCancel);
+			case WorldGate.Verdict.Open matches -> open(flows, levelId, onCancel);
 			case WorldGate.Verdict.Lift lift -> {
 				Optional<String> failure = WorldGate.lift(world, CommitmentServer.store(), lift.record());
 				if (failure.isPresent()) {

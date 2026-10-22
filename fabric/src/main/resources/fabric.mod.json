@@ -21,7 +21,7 @@
 	"depends": {
 		"fabricloader": ">=0.19.5",
 		"minecraft": "${minecraftRange}",
-		"java": ">=25",
+		"java": ">=${javaRelease}",
 		"fabric-api": "*"
 	}
 }

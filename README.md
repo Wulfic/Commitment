@@ -8,14 +8,16 @@ resource packs or config change, and shows what changed. Changing them anyway ta
 
 ## Supported versions
 
-The current band is **26.x**: Minecraft 26.1 to 26.3, on Fabric, Quilt, NeoForge and Forge. Fixes and features
-go to the current band only. Older bands are frozen: their releases stay up, but they get no fixes.
+The current band is **26.x**: Minecraft 26.1 to 26.3, on Fabric, Quilt, NeoForge and Forge. Minecraft
+**1.21.11 on Fabric** is supported too, and gets the same fixes. Fixes and features go to these only. Older bands
+are frozen: their releases stay up, but they get no fixes.
 
 Each release has one jar per Minecraft band and loader, named `commitment-<version>+<loader>-mc<band>.jar`. Pick
 the loader you run and the band that holds your Minecraft version:
 
 | Minecraft | Fabric and Quilt | NeoForge | Forge |
 |---|---|---|---|
+| **1.21.11** | `mc1.21.11`: Fabric only | — | — |
 | **26.1 – 26.1.2** | `mc26.1`: 26.1 – 26.1.2 | `mc26.1.2`: 26.1.2 only | `mc26.1.2`: 26.1.2 only |
 | **26.2** | `mc26.2` | `mc26.2` | `mc26.2` |
 | **26.3** | `mc26.3` | `mc26.3` | `mc26.3` |

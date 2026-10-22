@@ -1,5 +1,6 @@
 plugins {
-	id 'net.fabricmc.fabric-loom'
+	// fabric-loom-remap on an obfuscated Minecraft (1.21.11), fabric-loom on 26.x (settings.gradle).
+	id 'dev.kikugie.loom-back-compat'
 }
 
 // Everything that doesn't touch a loader: the manifest, the lock record, the guard pack, the timer and every
@@ -37,10 +38,12 @@ loom {
 dependencies {
 	// The node's band is the Minecraft version. The other pins are in gradle.properties.
 	minecraft "com.mojang:minecraft:${stonecutter.current.version}"
+	// Mojang names on an obfuscated Minecraft; 26.x needs none.
+	loomx.applyMojangMappings()
 
 	// Only for the tests: fabric-loader-junit needs the loader's own libraries (ASM, Mixin), which Loom adds
 	// for a loader dependency. LoaderFreeTest keeps loader APIs out of the sources.
-	implementation "net.fabricmc:fabric-loader:${project.loader_version}"
+	modImplementation "net.fabricmc:fabric-loader:${project.loader_version}"
 
 	testImplementation platform("org.junit:junit-bom:${project.junit_version}")
 	// Boots Minecraft's registries inside JUnit, for tests that need them.
@@ -49,13 +52,15 @@ dependencies {
 	testRuntimeOnly "org.junit.platform:junit-platform-launcher"
 }
 
+// The node's Java release (gradle.properties java_version): 1.21.11 players run Java 21, so its class files must load there.
+def javaRelease = project.property("java_version.${stonecutter.current.version}") as int
 tasks.withType(JavaCompile).configureEach {
-	it.options.release = 25
+	it.options.release = javaRelease
 }
 
 java {
-	sourceCompatibility = JavaVersion.VERSION_25
-	targetCompatibility = JavaVersion.VERSION_25
+	sourceCompatibility = JavaVersion.toVersion(javaRelease)
+	targetCompatibility = JavaVersion.toVersion(javaRelease)
 }
 
 test {

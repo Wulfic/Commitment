@@ -14,13 +14,18 @@ import java.util.OptionalLong;
 import java.util.zip.GZIPInputStream;
 
 /**
- * A world's seed, read before the world loads, from {@code data/minecraft/world_gen_settings.dat}: on 26.x the seed is
- * saved data of its own, gzip NBT shaped {@code {data:{seed:<long>, ...}, DataVersion:<int>}}. Read here rather than
- * through vanilla's {@code NbtIo}, whose signatures change between 26.x nodes. Read-only, never written.
+ * A world's seed, read before the world loads. On 26.x it's saved data of its own, {@code
+ * data/minecraft/world_gen_settings.dat}, gzip NBT shaped {@code {data:{seed:<long>, ...}}}; on 1.21.11 it's in
+ * {@code level.dat}, {@code {Data:{WorldGenSettings:{seed:<long>, ...}}}}. Read here rather than through vanilla's
+ * {@code NbtIo}, whose signatures change between nodes. Read-only, never written.
  */
 public final class WorldSeed {
 	public static final String FILE = "data/minecraft/world_gen_settings.dat";
-	/** The real file is a few hundred bytes; this only stops a crafted gzip from filling memory. */
+	/** Where 1.21.11 keeps the seed: the world's own {@code level.dat}. */
+	public static final String LEVEL_DAT = "level.dat";
+	private static final String[] FILE_PATH = {"data", "seed"};
+	private static final String[] LEVEL_DAT_PATH = {"Data", "WorldGenSettings", "seed"};
+	/** The real files are a few KB; this only stops a crafted gzip from filling memory. */
 	private static final int MAX_DECODED = 4 * 1024 * 1024;
 	private static final int MAX_DEPTH = 64;
 
@@ -31,13 +36,29 @@ public final class WorldSeed {
 	private WorldSeed() {
 	}
 
-	/** The seed, or empty when the file is missing or can't be read (logged): the gate then can't match by seed. */
+	/** The seed, or empty when neither file holds it or one can't be read (logged): the gate then can't match by seed. */
 	public static OptionalLong read(Path worldDir) {
 		Path file = worldDir.resolve(FILE);
 		try {
-			return parse(Files.readAllBytes(file));
+			return parse(Files.readAllBytes(file), FILE_PATH);
 		} catch (NoSuchFileException e) {
-			Commitment.LOGGER.warn("Commitment: {} has no {}; its seed is unknown", worldDir.getFileName(), FILE);
+			return readLevelDat(worldDir);
+		} catch (IOException e) {
+			Commitment.LOGGER.warn("Commitment: can't read the seed from {} ({}); it's unknown", file, e.getMessage());
+			return OptionalLong.empty();
+		}
+	}
+
+	private static OptionalLong readLevelDat(Path worldDir) {
+		Path file = worldDir.resolve(LEVEL_DAT);
+		try {
+			OptionalLong seed = parse(Files.readAllBytes(file), LEVEL_DAT_PATH);
+			if (seed.isEmpty()) {
+				Commitment.LOGGER.warn("Commitment: {} has no {} and no seed in {}; its seed is unknown", worldDir.getFileName(), FILE, LEVEL_DAT);
+			}
+			return seed;
+		} catch (NoSuchFileException e) {
+			Commitment.LOGGER.warn("Commitment: {} has neither {} nor {}; its seed is unknown", worldDir.getFileName(), FILE, LEVEL_DAT);
 			return OptionalLong.empty();
 		} catch (IOException e) {
 			Commitment.LOGGER.warn("Commitment: can't read the seed from {} ({}); it's unknown", file, e.getMessage());
@@ -45,8 +66,11 @@ public final class WorldSeed {
 		}
 	}
 
-	/** {@code data.seed} of the gzip NBT, or empty when it isn't there or isn't a long. */
-	static OptionalLong parse(byte[] gzip) throws IOException {
+	/**
+	 * The long at {@code path} (compound names, then the long's name) in the gzip NBT, or empty when it isn't there or
+	 * isn't a long.
+	 */
+	static OptionalLong parse(byte[] gzip, String... path) throws IOException {
 		byte[] nbt;
 		try (InputStream in = new GZIPInputStream(new ByteArrayInputStream(gzip))) {
 			nbt = in.readNBytes(MAX_DECODED + 1);
@@ -59,20 +83,24 @@ public final class WorldSeed {
 			throw new IOException("the root isn't a compound");
 		}
 		skipString(in);
-		// Root compound: find "data", a compound; in it, "seed", a long.
+		return find(in, path, 0);
+	}
+
+	/** In the compound being read, follows {@code path[depth..]}: compounds down to the long at the end. */
+	private static OptionalLong find(DataInputStream in, String[] path, int depth) throws IOException {
+		boolean last = depth == path.length - 1;
 		for (byte type; (type = in.readByte()) != END; ) {
 			String name = readString(in);
-			if (type == COMPOUND && name.equals("data")) {
-				for (byte inner; (inner = in.readByte()) != END; ) {
-					String key = readString(in);
-					if (inner == LONG && key.equals("seed")) {
-						return OptionalLong.of(in.readLong());
-					}
-					skip(in, inner, 1);
+			if (name.equals(path[depth])) {
+				if (last && type == LONG) {
+					return OptionalLong.of(in.readLong());
+				}
+				if (!last && type == COMPOUND) {
+					return find(in, path, depth + 1);
 				}
 				return OptionalLong.empty();
 			}
-			skip(in, type, 1);
+			skip(in, type, depth + 1);
 		}
 		return OptionalLong.empty();
 	}

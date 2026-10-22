@@ -1,7 +1,7 @@
 plugins {
 	id 'dev.kikugie.stonecutter'
-	// Loaded once here, so every node shares one Loom classloader and one Minecraft cache.
-	id 'net.fabricmc.fabric-loom' version "${loom_version}" apply false
+	// Loaded once here, so every node shares one classloader per plugin. Loom comes from loom-back-compat
+	// (settings.gradle), which picks the remapping or the plain plugin per node.
 	id 'net.neoforged.moddev' version "${moddev_version}" apply false
 	id 'net.minecraftforge.gradle' version "${forgegradle_version}" apply false
 }

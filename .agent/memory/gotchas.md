@@ -194,3 +194,17 @@ filter and `GameTestSourcesTest` skip client tests by the `*ClientGameTest.java`
 test named otherwise is copied to NeoForge/Forge, where `net.fabricmc...client.gametest` doesn't exist.
 **Fix:** named it `WorldGateClientGameTest`.
 **Affects:** fabric/src/gametest/java, fabric/build.gradle, GameTestSourcesTest
+
+## 2026-10-22 — loom-back-compat in a Stonecutter build with branches needs buildscript repositories
+**Symptom:** `A problem occurred configuring project ':common'. Cannot resolve external dependency
+net.fabricmc.fabric-loom:...gradle.plugin:1.18.4 because no repositories are defined.`
+**Cause:** loom-back-compat 0.4.3 registers `gradle.lifecycle.beforeProject` (read from its jar) and adds both Loom
+plugins to **every** project's buildscript classpath. A branch project (`:common`, `:fabric`) has no build file of its
+own, so pluginManagement's repositories never reach its classpath. ../enchanting-2 has no branch projects, which is
+why it never hit this.
+**Dead end:** adding `buildscript.repositories` in a settings `beforeProject` while pluginManagement used
+`exclusiveContent` → "When using exclusive repository content in 'settings.pluginManagement.repositories', you cannot
+add repositories to 'buildscript.repositories'".
+**Fix:** the KikuGie repo as a plain `maven { content { includeGroupAndSubgroups 'dev.kikugie' } }`, plus a settings
+`gradle.lifecycle.beforeProject { buildscript.repositories { Fabric, mavenCentral, gradlePluginPortal } }`.
+**Affects:** settings.gradle

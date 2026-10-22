@@ -597,7 +597,7 @@ NeoForge and Forge first** (step C.0), so Proof 2 runs on all nine loader × nod
       node, so `Platform` is installed in time on all three loaders.
       **Review notes:** internet time is bounded (connect + read timeouts and a hard deadline), so the "checking" screen
       can't hang. The interim refusal ends with the timer text "/unlock starts…", which a refused world can't run: C.4.
-- [ ] C.2a **Fabric 1.21.11 node** (owner, session 6: "add support for fabric 1.21.11 only, then we can run live
+- [x] C.2a **Fabric 1.21.11 node** (owner, session 6: "add support for fabric 1.21.11 only, then we can run live
       tests"). Done right after C.2 is committed, before C.3, so C.3–C.6 are written and tested against it from the
       start. Tier 2 (a new Minecraft version). Fabric only: no NeoForge, Forge or Quilt for 1.21.11.
       **Facts first (mc-port):** 1.21.11 is obfuscated, 26.x isn't, so the node needs Loom's remapping plugin and
@@ -630,6 +630,70 @@ NeoForge and Forge first** (step C.0), so Proof 2 runs on all nine loader × nod
       does `configurePackRepository` still auto-enable a world pack whose `min_format` is above the game's, and do
       `check`/`load` parse there. If not, `GuardPack` writes a per-version `pack.mcmeta` (0.2's fallback); (3) the
       GameTest API on 1.21.11 (`GuardGameTest`'s mock player helper, `TestData`).
+      **Answered (session 6):** (1) a real 1.21.11 world (../enchanting-2 `run/server/world`, DataVersion 4671, read
+      only): the seed is `level.dat` → `Data.WorldGenSettings.seed` (long); game rules are `Data.game_rules` (for C.6).
+      javap: `WorldGenSettings` is a codec record on 1.21.11, written by `PrimaryLevelData` under `WorldGenSettings`.
+      (2) 1.21.11 data pack format is **94.1** (`version.json`). Decompiled (Vineflower 1.12.0, Mojang names):
+      `configurePackRepository` has the same auto-enable loop as 26.x (no compatibility filter), and `PackFormat` is the
+      same code: `min_format` above 81 needs no `pack_format`. So today's pack (`min_format` 101) loads there, labelled
+      "(incompatible)". (3) left to the compiler: every import, compiled on the node.
+      **Plan (Tier 2, written before the first edit):**
+      1. `settings.gradle`: plugin `dev.kikugie.loom-back-compat` 0.4.3 (KikuGie releases repo, `exclusiveContent` for
+         `dev.kikugie`, as ../enchanting-2); `1.21.11` added to the `common` and `fabric` branches only. `vcsVersion`
+         stays 26.1.2, so 1.21.11 code lives in `//? if <26.1` blocks.
+      2. `stonecutter.gradle`: Loom no longer loaded at the root (loom-back-compat picks `fabric-loom-remap` or
+         `fabric-loom` per node at `loomx.loom_version`); MDG and ForgeGradle stay.
+      3. `common/build.gradle`, `fabric/build.gradle`: `id 'dev.kikugie.loom-back-compat'`, `loomx.applyMojangMappings()`,
+         loader + Fabric API through `mod*` configurations, `options.release` and `java` compatibility from a per-node
+         `java_version` (21 on 1.21.11, 25 on 26.x). Javac 25 with `--release 21`: no extra JDK needed to build.
+      4. `gradle.properties`: `loomx.loom_version=1.18.4` (replaces `loom_version`), and for 1.21.11:
+         `fabric_api_version` 0.141.6+1.21.11, `minecraft_range` `>=1.21.11 <1.21.12`, `band_label` 1.21.11,
+         `java_version` 21, `smoke_floor`/`smoke_fabric_api`. `java_version` 25 for the 26.x nodes.
+      5. Sources: the six `case X _` → named; `//? if` blocks wherever the compiler says 1.21.11 differs.
+      6. `WorldSeed`: when `world_gen_settings.dat` is absent, read `level.dat` → `Data.WorldGenSettings.seed` (read-only,
+         same bounded reader). Fixture: that 1.21.11 `level.dat` (a dev server world: no player data) + tests.
+      7. `GuardPack`: `min_format` 101 → **94** so the pack reads as compatible on every node (still > 81, so no
+         `pack_format`); golden files regenerated, `GuardPackTest` green. A committed dev world's old pack is replaced
+         as stale by the gate (`Repair.REPLACE_STALE`).
+      8. README band statement (26.x on Fabric/NeoForge/Forge, plus Fabric 1.21.11) and `ReadmeBandsTest`,
+         `BandLabelTest` cover the new node. `fabric.mod.json` range per node.
+      **Not doing:** NeoForge, Forge or Quilt on 1.21.11; a JDK 21 toolchain download (`--release 21` checks the API
+      surface; the instance run in Stage E runs the jar on the owner's Java 21); anything from C.3 on.
+      **Blast radius:** build config shared by all 12 nodes: the full build must stay green on every 26.x node before
+      the 1.21.11 node counts. No world or user file is touched; `run/fabric/1.21.11/` is new. **Rollback:** `git revert`
+      of the C.2a commits.
+      **Proof:** `./gradlew build` on 13 nodes (counts read per node; the 1.21.11 jar's class files major 65), GameTests
+      on `:fabric:1.21.11`, `boot.txt` + the locked boots on fabric 1.21.11, `runClientGameTest` on 1.21.11, the guard
+      pack's `check`/`load` parsing on 1.21.11 (a C.1 smoke on the node).
+      **Session 6, in progress (uncommitted, tree dirty on purpose: don't revert):** plan steps 1–8 are all in the tree.
+      Deviations: KikuGie repo is a `content` filter, not `exclusiveContent`, plus buildscript repositories for every
+      project from settings (gotchas.md 2026-10-22); `fabric.mod.json` `"java"` is now `>=${javaRelease}` per node (was a
+      hard `>=25`, which would refuse Java 21); `BandLabelTest` takes a 3-part label (`>=X.Y.Z <X.Y.(Z+1)`);
+      `ReadmeBandsTest` wants `—` in a loader cell with no `<loader>_band_label`; the client GameTest's chunk wait has a
+      third branch (`getClientWorld()`, client-gametest 4.3.5 on 1.21.11). **Runs so far:** `:common:1.21.11:build
+      :fabric:1.21.11:build` exit 0: common **245** JUnit (3 new `WorldSeedTest`), fabric 12, GameTests "4 of ours and 1
+      others ran, 0 failed" (GuardGameTest runs the guard's own commands, so they parse on 1.21.11). Shipped
+      `libs/commitment-0.1.0+fabric-mc1.21.11.jar`: class major 65, `java >=21`, `minecraft >=1.21.11 <1.21.12`, mixin
+      targets remapped in place to intermediary (`class_32.method_52236`, `class_7196.method_57784`, `field_37914`; no
+      refmap needed). **Full build, end of session 6:** `./gradlew build` exit 0 on all 13 nodes: common **245** JUnit on each of 4
+      nodes, fabric 12 on each of 4, GameTests "4 of ours and 1 others ran, 0 failed" on all ten loader x node pairs, 0
+      warnings. **Not yet:** `boot.txt` + the three locked boots on fabric 1.21.11, `runClientGameTest` on 1.21.11, mutation checks of the new
+      `WorldSeed` fallback (drop it → `readsTheSeedOfA12111WorldFromItsLevelDat` red) and of `ReadmeBandsTest`'s `—`
+      rule (put `mc1.21.11` in the NeoForge cell → red), then commit C.2a.
+      **Done, session 7 (2026-10-22):** `./gradlew build` exit 0 on **all 13 nodes**; counts from the XML: common **245**
+      per node (×4), fabric 12 per node (×4), 0 failed or skipped; GameTests "4 of ours and 1 others ran, 0 failed" on all
+      ten (fabric ×4, neoforge ×3, forge ×3); no javac warnings. **Rung 3, fabric 1.21.11:** `scripts/checks/boot.txt` exit 0
+      (`Commitment 0.1.0 loaded on Fabric 0.19.5, Minecraft 1.21.11`; the check's version pattern widened from `26\.` to
+      any version); `guard-pack-smoke.sh locked-boot.txt locked-unlock.txt locked-cancel.txt` exit 0: refused with exit 1
+      each boot, `unlock available at 2026-10-23 02:52 GMT-04:00 (24h)`, `unlock cancelled`, cleanup removed zip + record
+      + mirror. **Rung 5:** `:fabric:1.21.11:runClientGameTest` exit 0: `client world check: PASS`, `locked screen (1
+      changes)`, `client gate check: PASS`; on the pass path vanilla logged `Found new data pack file/commitment_guard.zip,
+      loading it automatically` with no function-load failure, so the `min_format` 94 pack loads on 1.21.11 (the
+      mod-missing penalty there is Proof 4, C.5). **Mutations**, each restored and `cmp`-verified: the `level.dat`
+      fallback dropped → `readsTheSeedOfA12111WorldFromItsLevelDat` red (1 of 10); `mc1.21.11` in README's NeoForge cell →
+      `ReadmeBandsTest.eachRowNamesItsBandsJars` red ("names a jar the build doesn't make").
+      **Noted, not fixed:** the build prints "Deprecated Gradle features were used" from a task at execution time (none
+      at configuration, `help --warning-mode all`). Find which before Gradle 10.
 - [ ] C.2b **Save safety** (owner, session 6: "we have to be 100% sure we don't accidentally ruin people's saves").
       - A JUnit source scan: only `LockStore`, `GuardPack`'s writer and `LockLifter` may call `Files.write|move|delete|
         copy|newOutputStream` or `FileOutputStream`; any other class doing so fails the test (mutation: a stray write
@@ -678,6 +742,10 @@ NeoForge and Forge first** (step C.0), so Proof 2 runs on all nine loader × nod
       **Owner, session 6:** add a Fabric 1.21.11 node (C.2a) and run Commitment live on a **copy** of that instance.
       For each 26.x node, build a simple test pack or use a premade vanilla+ pack (Modrinth), on every loader that has
       one, and run the same 3-restart check there. Packs are downloaded into `run/packs/<node>/`, never into Prism.
+      **Owner, session 7:** the 1.21.11 copy runs as a **Loom dev client** (`:fabric:1.21.11:runClient` with the
+      instance's mods, config and resource packs copied into `run/packs/1.21.11/`, offline dev account), scripted
+      restarts; mods that won't run in a dev environment get reported. The 26.x nodes use a **premade Modrinth vanilla+
+      pack** per node and loader where one exists, a small handmade one where none does (decisions.md 2026-10-22).
 - [ ] E.2 Time the scan on that pack. If it adds more than 2 s to world open, optimize, and
       measure before and after.
 

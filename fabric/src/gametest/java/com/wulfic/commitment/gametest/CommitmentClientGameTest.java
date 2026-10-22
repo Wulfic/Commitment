@@ -19,9 +19,11 @@ public class CommitmentClientGameTest implements FabricClientGameTest {
 		try (TestSingleplayerContext world = context.worldBuilder().create()) {
 			//? if >=26.2 {
 			/*world.getConnection().waitForChunksDownload();
-			*///?} else {
+			*///?} else if >=26.1 {
 			world.getClientLevel().waitForChunksDownload();
-			//?}
+			//?} else {
+			/*world.getClientWorld().waitForChunksDownload();
+			*///?}
 			context.waitTicks(20);
 			boolean inWorld = context.computeOnClient(client -> client.level != null && client.player != null);
 			check(inWorld, "the client is not in the world it created");

@@ -1,6 +1,6 @@
 # Boot fingerprint (TODO.md A.4): Commitment's entrypoint ran on this loader and Minecraft, and the console reaches the
 # server, so the later checks' commands aren't typed into nothing.
-#   LOADER=<fabric|neoforge|forge> NODE=<26.1.2|26.2|26.3> scripts/dev-server-smoke.sh scripts/checks/boot.txt
+#   LOADER=<fabric|neoforge|forge> NODE=<1.21.11 (fabric only)|26.1.2|26.2|26.3> scripts/dev-server-smoke.sh scripts/checks/boot.txt
 list
-@expect Commitment [^ ]+ loaded on (Fabric|Quilt|NeoForge|Forge) [^ ]+, Minecraft 26\.
+@expect Commitment [^ ]+ loaded on (Fabric|Quilt|NeoForge|Forge) [^ ]+, Minecraft [0-9]+\.[0-9]+
 @expect There are 0 of a max of [0-9]+ players online

@@ -91,11 +91,11 @@ public final class UnlockTimer {
 
 	public static String message(Status status, ZoneId zone) {
 		return switch (status) {
-			case Status.Locked _ -> "Commitment: this world is committed. /unlock starts the 24-hour unlock";
+			case Status.Locked() -> "Commitment: this world is committed. /unlock starts the 24-hour unlock";
 			case Status.Pending p -> "Commitment: unlock available at " + when(p.availableAt(), zone) + " (" + remaining(p.remaining()) + " left)";
 			case Status.Unverified u -> "Commitment: the unlock was due at " + when(u.availableAt(), zone)
 					+ ", but internet time can't be checked (" + u.reason() + "), so the world stays locked";
-			case Status.Lifted _ -> "Commitment: lock lifted, run /commit to lock again";
+			case Status.Lifted() -> "Commitment: lock lifted, run /commit to lock again";
 		};
 	}
 

@@ -19,7 +19,10 @@ import java.util.zip.GZIPOutputStream;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-/** C.2: the seed, read from real world_gen_settings.dat files written by the 26.1.2 and 26.3 dev servers. */
+/**
+ * C.2: the seed, read from real files: world_gen_settings.dat written by the 26.1.2 and 26.3 dev servers, and the
+ * level.dat of a 1.21.11 dev server world (../enchanting-2), where 1.21.11 keeps it.
+ */
 class WorldSeedTest {
 	@TempDir
 	Path world;
@@ -34,6 +37,31 @@ class WorldSeedTest {
 	void readsTheSeedOfA263World() throws IOException {
 		place(fixture("26.3.dat"));
 		assertEquals(OptionalLong.of(-7577260931055116372L), WorldSeed.read(world));
+	}
+
+	@Test
+	void readsTheSeedOfA12111WorldFromItsLevelDat() throws IOException {
+		placeLevelDat(fixture("1.21.11-level.dat"));
+		assertEquals(OptionalLong.of(-1198787977897619755L), WorldSeed.read(world));
+	}
+
+	@Test
+	void the26xFileWinsOverLevelDat() throws IOException {
+		placeLevelDat(fixture("1.21.11-level.dat"));
+		place(fixture("26.3.dat"));
+		assertEquals(OptionalLong.of(-7577260931055116372L), WorldSeed.read(world));
+	}
+
+	@Test
+	void aLevelDatWithoutWorldGenSettingsGivesNoSeed() throws IOException {
+		placeLevelDat(gzip(nbt(out -> {
+			compound(out, "Data");
+			out.writeByte(4);
+			name(out, "seed");
+			out.writeLong(5L);
+			out.writeByte(0);
+		})));
+		assertEquals(OptionalLong.empty(), WorldSeed.read(world));
 	}
 
 	@Test
@@ -59,7 +87,7 @@ class WorldSeedTest {
 			name(out, "seed");
 			name(out, "12345");
 			out.writeByte(0);
-		}))));
+		})), "data", "seed"));
 	}
 
 	@Test
@@ -86,12 +114,12 @@ class WorldSeedTest {
 			name(out, "seed");
 			out.writeLong(99L);
 			out.writeByte(0);
-		}))));
+		})), "data", "seed"));
 	}
 
 	@Test
 	void aRootThatIsntACompoundIsRefused() throws IOException {
-		assertThrows(IOException.class, () -> WorldSeed.parse(gzip(new byte[] {8, 0, 0, 0, 0})));
+		assertThrows(IOException.class, () -> WorldSeed.parse(gzip(new byte[] {8, 0, 0, 0, 0}), "data", "seed"));
 	}
 
 	private interface Body {
@@ -133,6 +161,10 @@ class WorldSeedTest {
 		Path file = world.resolve(WorldSeed.FILE);
 		Files.createDirectories(file.getParent());
 		Files.write(file, bytes);
+	}
+
+	private void placeLevelDat(byte[] bytes) throws IOException {
+		Files.write(world.resolve(WorldSeed.LEVEL_DAT), bytes);
 	}
 
 	private static byte[] fixture(String name) throws IOException {
