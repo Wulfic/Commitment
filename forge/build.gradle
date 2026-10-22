@@ -88,6 +88,10 @@ minecraft {
 		register('gameTestServer') {
 			workingDir = layout.buildDirectory.dir('run/gameTest').get().asFile
 		}
+		// Development writes its lock mirrors here, never into the developer's own user data dir (MirrorDir.OVERRIDE).
+		configureEach {
+			systemProperty 'commitment.mirrorDir', new File(runRoot, "mirror").absolutePath
+		}
 	}
 }
 

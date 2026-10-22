@@ -4,7 +4,7 @@
 > cheap to read at the start of every session. History belongs in `decisions.md` and
 > `gotchas.md`; this file only answers "where am I right now?".
 
-**Last updated:** 2026-10-21 (session 4)
+**Last updated:** 2026-10-21 (session 5)
 **Branch:** `main`, always (decisions.md 2026-10-21). Push each green stage (owner, 2026-10-21).
 
 ## Where we are
@@ -19,25 +19,25 @@
   (all-or-nothing, **renames** to `*.<lockId>.lifted`: owner, session 4). Common 207 tests per node, every guard
   mutation-checked. The guard pack is proven live on Fabric 26.1.2/26.2/26.3 (`scripts/guard-pack-smoke.sh`).
 
-## Next
-1. Push Stage B (owner: push each green stage; no CI here, so a push can't release).
-2. **Stage C** (owner, session 4: carry on into it; game windows are OK, one at a time). Write C's design into
-   TODO.md first. Mixins can live in common (`org.spongepowered` isn't a loader API to LoaderFreeTest); Forge names
-   mixin configs in the jar manifest plus `--mixin.config` dev args (../enchanting-2/build.forge.gradle).
-   The gate passes `LockStore.load` the seed (read-only from level.dat) and `GuardPack.read(world)`.
-   `InternetTime.read()` blocks for up to ~9 s: never on the render thread.
-3. Stage C needs a real-server smoke tool (copy `../the-continent/tools/server_smoke.py`) for Proof 4 (vanilla
-   server, guard pack only) and Proof 7 (Quilt + built jars).
+## Next (session 5)
+- Stage B pushed (3c2a12f). C.0 (47c5006) and **C.1 committed, not pushed**: heartbeat, self-heal at start, the guard pack
+  re-enabled when disabled; common 231 JUnit per node, GameTests 4 of ours on all nine, smoked on all nine (TODO C.1).
+- **C.2 in progress, uncommitted:** `gate/WorldSeed`, `gate/WorldGate` and their tests are in the tree (green). Drafts of
+  `ServerGate` (+ test), `MainMixin`, `ClientGate` are in the session scratchpad only; TODO C.2 lists the design.
+- Owner rulings (decisions.md): lift is all-or-nothing and renames to `*.<lockId>.lifted`; a locked dedicated server
+  unlocks with `-Dcommitment.unlock=start|cancel`; the dev mirror override works in development runs only.
+- Push when Stage C is green (no CI: a push can't release).
+- Stage C still needs a real-server smoke tool (`../the-continent/tools/server_smoke.py`) for Proof 4 and 7.
+- **Ask the owner before Stage E:** the named Prism instance is 1.21.11, which Commitment can't run (TODO E.1).
 
 ## How to run things
 - Build: `./gradlew build` (all 12 nodes; Fabric's `check` includes `runGameTest`). Read counts from
   `*/versions/*/build/test-results/test/*.xml`, not the exit code.
 - Dev server: `LOADER=<fabric|neoforge|forge> NODE=<26.1.2|26.2|26.3> scripts/dev-server-smoke.sh scripts/checks/boot.txt`.
-  Port **25571**, run dirs `run/<loader>/<node>/server`. `--self-test` checks the verdict (12 cases).
+  Port **25571**, run dirs `run/<loader>/<node>/server`. `--self-test` checks the verdict (14 cases; `@reject` = must not match).
 - Client check: `./gradlew :fabric:<node>:runClientGameTest` opens a game window; look for `client world check: PASS`.
 
 ## Open questions / blockers
-- **Rotate the credentials** tracked in the template's history before 2026-10-21 (commit `8108c25`; gotchas.md).
 - `PowerShell(...)` permission-rule matching is unverified; treat the PowerShell tool as ungated.
 
 ## Do not forget

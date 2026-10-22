@@ -307,3 +307,27 @@ is tested where it differs. Taking the node-processed copy from Fabric keeps `//
 **Rejected:** Smokes only on NeoForge/Forge (owner's call). A second copy of the tests per loader (drifts). Our own
 annotation on Fabric too (Fabric's runner only reads its own).
 **Affects:** fabric/neoforge/forge build.gradle, forgelike/gametest/, neoforge|forge/src/gametest/
+
+## 2026-10-21 — Commitment: a locked dedicated server starts its unlock with `-Dcommitment.unlock=start`
+**Context:** The spec has a dedicated server log the changes and refuse to load a world whose setup changed. The
+client's locked screen has a "Start 24-hour unlock" button; a server admin had no way to reach `/unlock`, and with a
+damaged record (locked whatever the setup) no way out at all.
+**Choice:** Owner: a JVM flag. `-Dcommitment.unlock=start` (or `=cancel`) makes the server gate start (or stop) the
+timer with internet time, log `Commitment: unlock available at <time>`, and still refuse to load. After 24 h a normal
+start lifts the lock. The refusal's log names the flag.
+**Why:** It needs no world to load and no files to edit, and it's as deliberate as the client's confirm dialog.
+**Rejected:** A trigger file in the server dir (the same, with a file to create and delete). Reverting the setup only
+(no way out of a damaged record).
+**Affects:** common/.../gate/ServerGate, TODO.md C.2
+
+## 2026-10-21 — The dev mirror override (`-Dcommitment.mirrorDir`) works in development runs only
+**Context:** C.1 added `MirrorDir.OVERRIDE` so dev and GameTest runs keep their lock mirrors under `run/<loader>/<node>/mirror`
+instead of the developer's `%LOCALAPPDATA%`. Self-review: it was honoured in a released game too, so a player could add
+the flag, delete the world's record and guard pack, and the world would no longer be matched to its mirror by seed.
+**Choice:** `Platform.Loader.development()` (Fabric `isDevelopmentEnvironment()`, NeoForge `!FMLEnvironment.isProduction()`,
+Forge `!FMLEnvironment.production`, read from the pinned jars) gates it; outside development it's ignored with a warning.
+`guard-pack-smoke.sh` now fails a run that left no mirror in the dev dir, or whose lock id shows up in the real one.
+**Why:** The seam exists for development only; a production switch that hides every mirror is a bypass for one flag.
+**Rejected:** Leaving it on as "same bar as deleting the mirror" (deleting a file in a hidden user dir is harder than a
+launcher's JVM-args box). Keying it to a Gradle-only property name (a property is still settable by a player).
+**Affects:** common/.../lock/MirrorDir.java, platform/Platform.java, each loader's Platform, scripts/guard-pack-smoke.sh

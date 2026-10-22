@@ -208,6 +208,16 @@ class LockStoreTest {
 		return world.resolve(LockStore.WORLD_RECORD);
 	}
 
+	/** Windows can't replace a pack the server holds open; a failed replace must not leave its temp file in datapacks/. */
+	@Test
+	void aFailedReplaceLeavesNoTempFile() throws IOException {
+		Path target = dir.resolve("datapacks/commitment_guard.zip");
+		Files.createDirectories(target.resolve("in-the-way"));
+		assertThrows(IOException.class, () -> LockStore.writeAtomically(target, new byte[] {1, 2, 3}));
+		assertFalse(Files.exists(target.resolveSibling("commitment_guard.zip.tmp")), "the temp file is gone");
+		assertTrue(Files.isDirectory(target.resolve("in-the-way")), "what was there is untouched");
+	}
+
 	private Path mirrorFile(UUID id) {
 		return store.mirrorFile(id);
 	}

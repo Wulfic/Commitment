@@ -13,6 +13,7 @@
 #   <command>          typed into the server console, after this run's "Done (" line
 #   @sh <shell>        run with bash from the repo root between console commands (output to stderr)
 #   @expect <regex>    the server output must contain a line matching this (grep -E)
+#   @reject <regex>    the server output must contain no line matching this (grep -E)
 #   @allow-error <re>  an ERROR line from the mod matching this is expected, not a failure
 #   # comment, blank   ignored
 #
@@ -37,13 +38,14 @@ launched() {
 # verdict <server output> [commands file]: prints each failure, returns 0 (proven) or 1 (the mod is bad).
 verdict() {
 	local out=$1 commands=${2:-} fail=0 line re errors
-	local -a allowed=() expected=()
+	local -a allowed=() expected=() rejected=()
 	if [[ -n "$commands" ]]; then
 		while IFS= read -r line || [[ -n "$line" ]]; do
 			line=${line%$'\r'}
 			case "$line" in
 				@allow-error\ *) allowed+=("${line#@allow-error }") ;;
 				@expect\ *) expected+=("${line#@expect }") ;;
+				@reject\ *) rejected+=("${line#@reject }") ;;
 			esac
 		done < "$commands"
 	fi
@@ -66,6 +68,14 @@ verdict() {
 			fail=1
 		fi
 	done
+	for re in ${rejected[@]+"${rejected[@]}"}; do
+		if line=$(grep -m1 -E -- "$re" "$out"); then
+			echo "FAIL: a line matches @reject $re: $line"
+			fail=1
+		else
+			echo "no line matches @reject $re"
+		fi
+	done
 	return $fail
 }
 
@@ -84,6 +94,9 @@ self_test() {
 	printf '%s\n' "$boot" "$done_line" '[16:00:07] [Server thread/INFO] (commitment) Commitment: world committed (3 mods)' > "$dir/expected.log"
 	printf '%s\n' '@allow-error lock record unreadable' > "$dir/allow.txt"
 	printf '%s\r\n' '@expect Commitment: world committed' > "$dir/expect-crlf.txt"
+	printf '%s\n' '@reject Commitment guard: Commitment is missing' > "$dir/reject.txt"
+	printf '%s\n' "$boot" "$done_line" '[16:00:08] [Server thread/INFO] (Minecraft) [Server] Commitment guard: Commitment is missing' \
+		> "$dir/rejected.log"
 
 	check() { # check <expected status> <name> <log> [commands]
 		local want=$1 name=$2 got=0
@@ -105,6 +118,8 @@ self_test() {
 	check 0 "a matched @expect passes" "$dir/expected.log" "$dir/expect.txt"
 	check 0 "a CRLF commands file still matches" "$dir/expected.log" "$dir/expect-crlf.txt"
 	check 0 "@allow-error lets a named ERROR through" "$dir/error.log" "$dir/allow.txt"
+	check 1 "a line matching @reject fails" "$dir/rejected.log" "$dir/reject.txt"
+	check 0 "no line matching @reject passes" "$dir/good.log" "$dir/reject.txt"
 
 	# A crash during mod loading launched the game: that's a verdict (1), not "nothing proven" (2).
 	printf '%s\n' '> Task :forge:26.3:runServer' \
@@ -194,7 +209,7 @@ feed_console() {
 	if [[ -n "$COMMANDS_FILE" ]]; then
 		while IFS= read -r cmd || [[ -n "$cmd" ]]; do
 			cmd=${cmd%$'\r'}
-			[[ -z "$cmd" || "$cmd" == \#* || "$cmd" == @expect\ * || "$cmd" == @allow-error\ * ]] && continue
+			[[ -z "$cmd" || "$cmd" == \#* || "$cmd" == @expect\ * || "$cmd" == @reject\ * || "$cmd" == @allow-error\ * ]] && continue
 			if [[ "$cmd" == @sh\ * ]]; then
 				echo "dev-server-smoke: \$ ${cmd#@sh }" >&2
 				bash -c "${cmd#@sh }" >&2 || echo "dev-server-smoke: @sh step failed: ${cmd#@sh }" >&2

@@ -1,0 +1,8 @@
+# C.1, boot 2 of 2 (after guard-disable.txt, through the wrapper): the guard pack is on the world's disabled list, so
+# vanilla leaves it off. The mod turns it back on at server start, and the guard stays silent.
+@sh sleep 5
+datapack list enabled
+@expect Commitment: world world is committed; heartbeat on
+@expect Commitment: enabling the guard pack file/commitment_guard\.zip \(it was disabled\)
+@expect There are [0-9]+ data pack\(s\) enabled: .*file/commitment_guard\.zip
+@reject Commitment guard: Commitment is missing

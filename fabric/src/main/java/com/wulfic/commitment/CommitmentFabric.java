@@ -2,7 +2,11 @@ package com.wulfic.commitment;
 
 import static com.wulfic.commitment.Commitment.MOD_ID;
 
+import com.wulfic.commitment.platform.Platform;
+import com.wulfic.commitment.server.CommitmentServer;
 import net.fabricmc.api.ModInitializer;
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.loader.api.FabricLoader;
 import net.fabricmc.loader.api.ModContainer;
 
@@ -13,9 +17,13 @@ public final class CommitmentFabric implements ModInitializer {
 	@Override
 	public void onInitialize() {
 		FabricLoader loader = FabricLoader.getInstance();
-		String loaderId = loader.isModLoaded(QUILT_LOADER) ? QUILT_LOADER : "fabricloader";
-		Commitment.logLoaded(version(loader, MOD_ID), loaderId.equals(QUILT_LOADER) ? "Quilt" : "Fabric",
-				version(loader, loaderId));
+		boolean quilt = loader.isModLoaded(QUILT_LOADER);
+		FabricPlatform platform = new FabricPlatform(quilt ? "Quilt" : "Fabric", version(loader, quilt ? QUILT_LOADER : "fabricloader"));
+		Platform.install(platform);
+		ServerLifecycleEvents.SERVER_STARTED.register(CommitmentServer::started);
+		ServerLifecycleEvents.SERVER_STOPPED.register(CommitmentServer::stopped);
+		ServerTickEvents.END_SERVER_TICK.register(CommitmentServer::tick);
+		Commitment.logLoaded(version(loader, MOD_ID), platform.name(), platform.version());
 	}
 
 	private static String version(FabricLoader loader, String modId) {

@@ -1,5 +1,6 @@
 package com.wulfic.commitment.lock;
 
+import com.wulfic.commitment.Commitment;
 import java.nio.file.Path;
 import java.util.Locale;
 import java.util.Map;
@@ -10,10 +11,25 @@ import java.util.Map;
  * systems {@code $XDG_DATA_HOME/commitment/locks} (default {@code ~/.local/share}).
  */
 public final class MirrorDir {
+	/**
+	 * Set by the dev and GameTest runs (each loader's build.gradle), so development never writes into the developer's
+	 * own user data dir. Honoured in a development run only: in a released game one JVM flag would hide every world's
+	 * mirror, and a world whose record and guard pack were deleted would no longer be found by its seed.
+	 */
+	static final String OVERRIDE = "commitment.mirrorDir";
+
 	private MirrorDir() {
 	}
 
-	public static Path forThisMachine() {
+	/** @param development whether the loader says this is a development run ({@link #OVERRIDE} works only then) */
+	public static Path forThisMachine(boolean development) {
+		String override = System.getProperty(OVERRIDE);
+		if (override != null && !override.isBlank()) {
+			if (development) {
+				return Path.of(override).toAbsolutePath();
+			}
+			Commitment.LOGGER.warn("Commitment: ignoring -D{}: it only works in a development run", OVERRIDE);
+		}
 		return resolve(System.getProperty("os.name", ""), System.getenv(), System.getProperty("user.home"));
 	}
 

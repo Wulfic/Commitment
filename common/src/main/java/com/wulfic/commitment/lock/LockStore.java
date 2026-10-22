@@ -249,10 +249,18 @@ public final class LockStore {
 		Path tmp = file.resolveSibling(file.getFileName() + ".tmp");
 		Files.write(tmp, bytes);
 		try {
-			Files.move(tmp, file, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
-		} catch (AtomicMoveNotSupportedException e) {
-			Commitment.LOGGER.info("Commitment: {} can't be replaced atomically ({}); replacing it in place", file, e.getMessage());
-			Files.move(tmp, file, StandardCopyOption.REPLACE_EXISTING);
+			try {
+				Files.move(tmp, file, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+			} catch (AtomicMoveNotSupportedException e) {
+				Commitment.LOGGER.info("Commitment: {} can't be replaced atomically ({}); replacing it in place", file, e.getMessage());
+				Files.move(tmp, file, StandardCopyOption.REPLACE_EXISTING);
+			}
+		} catch (IOException e) {
+			// The temp file is the one written just above, never anyone else's. Left behind, vanilla lists a .zip.tmp as
+			// a "non-pack entry" in datapacks/ (Windows can't replace a pack the server holds open).
+			Files.deleteIfExists(tmp);
+			Commitment.LOGGER.warn("Commitment: replacing {} failed ({}); removed the temp file {}", file, e.getMessage(), tmp);
+			throw e;
 		}
 	}
 }

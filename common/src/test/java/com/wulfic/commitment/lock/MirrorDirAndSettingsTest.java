@@ -11,6 +11,38 @@ import org.junit.jupiter.api.Test;
 
 class MirrorDirAndSettingsTest {
 	@Test
+	void devRunsPointTheMirrorInsideTheirRunDir() {
+		String before = System.getProperty(MirrorDir.OVERRIDE);
+		try {
+			System.setProperty(MirrorDir.OVERRIDE, "run/fabric/26.3/mirror");
+			assertEquals(Path.of("run/fabric/26.3/mirror").toAbsolutePath(), MirrorDir.forThisMachine(true));
+		} finally {
+			restore(before);
+		}
+	}
+
+	/** Otherwise a player's JVM flag would hide every world's mirror. */
+	@Test
+	void aReleasedGameIgnoresTheOverride() {
+		String before = System.getProperty(MirrorDir.OVERRIDE);
+		try {
+			System.setProperty(MirrorDir.OVERRIDE, "somewhere/else");
+			assertEquals(MirrorDir.resolve(System.getProperty("os.name", ""), System.getenv(), System.getProperty("user.home")),
+					MirrorDir.forThisMachine(false));
+		} finally {
+			restore(before);
+		}
+	}
+
+	private static void restore(String before) {
+		if (before == null) {
+			System.clearProperty(MirrorDir.OVERRIDE);
+		} else {
+			System.setProperty(MirrorDir.OVERRIDE, before);
+		}
+	}
+
+	@Test
 	void windowsUsesLocalAppData() {
 		assertEquals(Path.of("C:\\Users\\p\\AppData\\Local", "Commitment", "locks"),
 				MirrorDir.resolve("Windows 11", Map.of("LOCALAPPDATA", "C:\\Users\\p\\AppData\\Local"), "C:\\Users\\p"));

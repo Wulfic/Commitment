@@ -55,6 +55,11 @@ loom {
 			runDir project.relativePath(new File(runRoot, "server"))
 			programArgs '--port', project.dev_server_port
 		}
+		// Every run, the GameTest ones included: development writes its lock mirrors here, never into the
+		// developer's own user data dir (MirrorDir.OVERRIDE).
+		configureEach {
+			property 'commitment.mirrorDir', new File(runRoot, "mirror").absolutePath
+		}
 	}
 }
 

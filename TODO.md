@@ -500,6 +500,36 @@ NeoForge and Forge first** (step C.0), so Proof 2 runs on all nine loader × nod
       `commitment:guard` every tick while committed. GameTests: the storage holds `alive` after a tick of a committed
       world; check.mcfunction's own lines, run as commands with a mock player, give no blindness with the heartbeat and
       blindness without it; a deleted guard pack is rewritten at start.
+      **In progress (session 4, uncommitted):** `Platform`, `WorldLock` (+ `Repair`: the gate replaces a stale pack, a
+      running server only writes a missing one: Windows can't replace a pack the server holds open, found live),
+      `CommitmentServer`, the three entrypoints, `GuardGameTest`, `WorldLockTest`, `MirrorDir.OVERRIDE`
+      (`commitment.mirrorDir`, set for every dev/test run to `run/<loader>/<node>/mirror`), `@reject` in the smoke (self-
+      test 14 cases, mutation-checked), `LockStore.writeAtomically` removes its temp file on failure. **Runs:** GameTests
+      "4 of ours, 0 failed" on fabric/neoforge/forge 26.1.2 (before the `Repair` change); `bash scripts/guard-pack-smoke.sh`
+      **exit 0 on all nine loader x node pairs** (heartbeat on, `{alive: 1b}`, pack enabled, `@reject` guard line clean,
+      cleanup removed zip + record + mirror).
+      **Session 5:** `./gradlew build` exit 0: common **230** JUnit per node (C.2's `WorldSeed`/`WorldGate` tests
+      included), fabric 12 per node, GameTests **"4 of ours and 1 others ran, 0 failed" on all nine**. Mutations, each
+      restored and `cmp`-verified: `Repair` ignored → `WorldLockTest.aRunningServerOnlyWritesAMissingPack` red; the
+      `GuardPack.write` in `WorldLock` removed → 3 `WorldLockTest` red; the temp-file delete removed →
+      `LockStoreTest.aFailedReplaceLeavesNoTempFile` red; the heartbeat writing `beating` instead of `alive` → 2 GameTests
+      red on `:fabric:26.3`; `BEATING.put` removed from `started` → `guard-pack-smoke.sh` on fabric 26.3 **exit 1** (no
+      `{alive: 1b}`, `@reject` hit: the guard fired). Writing `alive: false` instead caught only 1 GameTest: the guard
+      tests the key's presence, not its value, and `check`/`load` clear it each cycle, so that mutation isn't a break.
+      `makeMockServerPlayerInLevel` is vanilla `forRemoval` but the only helper that calls `PlayerList.placeNewPlayer`
+      (javap, all three nodes): one helper with an explained `@SuppressWarnings("removal")`.
+      **Gap closed:** nothing proved `select()` (vanilla enables a *new* pack by itself). `guard-pack-smoke.sh` now takes
+      several commands files, one boot each over the same world: `guard-disable.txt` then `guard-reenable.txt`
+      (`@expect Commitment: enabling the guard pack … (it was disabled)`). Mutation: `select(server)` removed → boot 2
+      exit 1 (no "enabling" line, pack not enabled). **Rung 3, all nine loader x node pairs:** `guard-pack.txt` exit 0
+      and `guard-disable.txt` + `guard-reenable.txt` exit 0 (27 boots, 9 "enabling the guard pack" lines, no leftovers).
+      **Review fix:** `-Dcommitment.mirrorDir` was honoured in a released game too (one JVM flag hid every mirror):
+      now only when `Platform.Loader.development()` (decisions.md). JUnit `aReleasedGameIgnoresTheOverride` (mutation
+      `if (true)` → red). The wrapper fails a run with no mirror in `run/<loader>/<node>/mirror` (mutation: the dir
+      pointed elsewhere → exit 1) or with the golden lock id in `%LOCALAPPDATA%\Commitment\locks`. Build after the fix:
+      exit 0, common 231 per node, fabric 12, GameTests 4 of ours on all nine, 0 warnings.
+      Rung 3 after the fix, one pair per loader (`development()` is per-loader code): fabric 26.1.2, neoforge 26.2,
+      forge 26.3, each `guard-pack.txt` and disable + re-enable exit 0, the mirror in `run/`, none in `%LOCALAPPDATA%`.
 - [ ] C.2 World-open gate: scan, compare; a mismatch → the LockedScreen (client) or log and stop
       (server); a timer that has run out → lift. The gate passes `LockStore.load` the world's seed (read
       from `level.dat`, read-only) and the guard pack's lock id; without the seed, a world whose record
@@ -512,6 +542,18 @@ NeoForge and Forge first** (step C.0), so Proof 2 runs on all nine loader × nod
       The server one is the `@Redirect` above: a locked world logs `Commitment: setup changed since /commit, refusing to
       load <world>` and each line, closes the access and exits 1. Fact first: the entrypoint (and so `Platform`) runs
       before `Main.main` reaches the gate on every loader (boot-log order).
+      **Owner, session 4:** a locked dedicated server starts its unlock with `-Dcommitment.unlock=start` (`=cancel` stops
+      it): the gate starts the timer with internet time, logs `Commitment: unlock available at <time>`, and still refuses
+      to load. The refusal's log names the flag (decisions.md).
+      **Started (session 4, uncommitted, not yet compiled with tests):** `gate/WorldSeed` (+ fixtures
+      `common/src/test/resources/world-seed/26.1.2.dat`, `26.3.dat`, real files, seeds 7878231855728691869 and
+      -7577260931055116372), `gate/WorldGate` + `WorldSeedTest`, `WorldGateTest`. Next: `ServerGate` (redirect in
+      `Main.main`, the `-Dcommitment.unlock` flag, exit 1), `ClientGate` + `WorldOpenFlowsMixin` (worker thread, re-enter
+      past the gate; interim screen: vanilla `AlertScreen`, same constructor on every node), `commitment.mixins.json`
+      (`compatibilityLevel` JAVA_21: Forge's Mixin 0.8.7 rejects JAVA_25, ../enchanting-2 gotchas), registered in
+      fabric.mod.json, neoforge.mods.toml `[[mixins]]`, Forge's `MixinConfigs` manifest + `--mixin.config` run args.
+      **Corrected session 5 (javap):** `Minecraft.setScreen` exists on 26.1.2 only; 26.2+ moved it to `Minecraft.gui.setScreen`.
+      `Minecraft.setScreenAndShow(Screen)` is on all three nodes (vanilla uses it for its own progress screens): use that.
 - [ ] C.3 Commands per the spec, registered through the platform seam. Server GameTests: every
       transition, each message, the 60 s confirm expiry, a non-host refused.
       **Design:** the Brigadier tree in common (`command/CommitmentCommands`), registered by Fabric's
@@ -545,6 +587,11 @@ NeoForge and Forge first** (step C.0), so Proof 2 runs on all nine loader × nod
       zero diffs. Every file that changes on its own goes into the ignore list, with a test.
       Change video, audio and shader settings → still zero diffs; anything that trips goes on
       the never-locked list.
+      **Owner, session 5:** use the Prism instance `1.21.11` (`%APPDATA%\PrismLauncher\instances\1.21.11`, read-only
+      look: Minecraft 1.21.11, Fabric Loader 0.19.5, 82 mods, 305 config files). **Open:** Commitment ships 26.x only,
+      so it can't load in that instance. Prism's `26.3` instance has only Fabric API and one other mod. Ask the owner
+      before Stage E: a scanner-only run on a copy (launch the copy 3×, scan with common's `ManifestScanner` between
+      launches), or a 26.x pack built from the same mods.
 - [ ] E.2 Time the scan on that pack. If it adds more than 2 s to world open, optimize, and
       measure before and after.
 

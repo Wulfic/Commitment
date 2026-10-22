@@ -165,3 +165,24 @@ GameTest mod left out of `loadedMods` → red). (2) The swap is a map declared w
 and the closure reads the map (mutation through the map → recompiles → red). (3) The `serverGameTestJava` artifact is
 `builtBy stonecutterGenerateGametest`.
 **Affects:** gradle/gametest-report.gradle, fabric/neoforge/forge build.gradle
+
+## 2026-10-21 — The leaked credentials are in the template's history, not Commitment's (blocker cleared)
+**Symptom:** state.md carried "rotate the credentials (commit `8108c25`)" as an open blocker for this repo.
+**Cause:** `8108c25` belongs to the template repo. Commitment was made with "Use this template", so its history starts
+from a fresh commit: `git rev-parse 8108c25` fails here, no `.env`, `.mcp.json` or `mcp.vscode-reference.json` was
+ever tracked in any of its commits, and `git log --all -p` has no GitHub PAT, context7 key or password pattern (checked
+session 5). The tracked `*.example*` files hold only placeholders, and the real files are git-ignored.
+**Fix:** Owner, session 5: if this repo is clean, clear the blocker and stop raising it. Cleared from state.md. The
+template repo's own history is outside this repo and not tracked here.
+**Affects:** .agent/memory/state.md
+
+## 2026-10-21 — `Minecraft.setScreen` is gone on 26.2+; the plan said it was on every node
+**Symptom:** C.2's plan (TODO.md) said `Minecraft.setScreen` and `setScreenAndShow` exist on every node. javap: `setScreen`
+is only on 26.1.2's `Minecraft`.
+**Cause:** 26.2 moved screen handling into `Gui`: vanilla's `WorldOpenFlows` on 26.3 calls `Gui.setScreen(Screen)` (via
+`minecraft.gui`) 15 times and `Minecraft.setScreenAndShow(Screen)` 10 times.
+**Fix:** Common client code uses `Minecraft.setScreenAndShow(Screen)`, present on 26.1.2, 26.2 and 26.3, or a Stonecutter
+block where the plain set is needed. The plan line was written from memory: read the jar.
+**Dead ends:** A `javap` per class over the whole client jar to find the new owner (minutes). Disassembling a vanilla
+caller (`WorldOpenFlows`) answered it in one command.
+**Affects:** C.2 client gate (ClientGate, WorldOpenFlowsMixin)

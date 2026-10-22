@@ -1,0 +1,10 @@
+# C.1, boot 1 of 2: disables the guard pack the way a player with cheats would. Vanilla keeps it on the world's
+# disabled list at stop, so the next boot doesn't enable it by itself. Run both boots through the wrapper, in order:
+#   LOADER=<fabric|neoforge|forge> NODE=<26.1.2|26.2|26.3> bash scripts/guard-pack-smoke.sh \
+#       scripts/checks/guard-disable.txt scripts/checks/guard-reenable.txt
+@sh sleep 5
+datapack disable "file/commitment_guard.zip"
+datapack list available
+@expect Commitment: world world is committed; heartbeat on
+@expect Disabling data pack .*file/commitment_guard\.zip
+@expect There are [0-9]+ data pack\(s\) available: .*file/commitment_guard\.zip

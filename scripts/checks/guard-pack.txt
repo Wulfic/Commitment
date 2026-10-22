@@ -1,9 +1,13 @@
-# B.6: the guard pack's golden files load on this node, and the guard fires when there's no heartbeat (the mod
-# doesn't set one until C.1, so on this run it must). Run through the wrapper, which zips the pack into the world:
+# C.1: the guard pack in a world with Commitment present stays silent. The mod finds the pack at server start (with no
+# record, that's a damaged lock: locked, and only the 24-hour timer opens it), turns the heartbeat on, and every 2 s
+# the guard finds it. Run through the wrapper, which zips the pack into the world and cleans up after:
 #   LOADER=<fabric|neoforge|forge> NODE=<26.1.2|26.2|26.3> bash scripts/guard-pack-smoke.sh
-# The first check runs 40 ticks after the first tick; give it time. No @expect on "Found new data pack": vanilla logs
-# that only the first time a world sees the pack, and after that level.dat lists it as enabled.
+# The guard firing without the mod is Proof 4 (a vanilla server), C.5.
 @sh sleep 5
+data get storage commitment:guard
 datapack list enabled
+@expect Commitment: no lock record can be trusted
+@expect Commitment: world world is committed; heartbeat on
+@expect Storage commitment:guard has the following contents: \{alive: 1b\}
 @expect There are [0-9]+ data pack\(s\) enabled: .*file/commitment_guard\.zip
-@expect Commitment guard: Commitment is missing
+@reject Commitment guard: Commitment is missing

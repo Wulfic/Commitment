@@ -98,6 +98,8 @@ neoForge {
 			if (name != 'gameTest') {
 				loadedMods = [mods.commitment]
 			}
+			// Development writes its lock mirrors here, never into the developer's own user data dir (MirrorDir.OVERRIDE).
+			systemProperty 'commitment.mirrorDir', new File(runRoot, "mirror").absolutePath
 		}
 	}
 }
