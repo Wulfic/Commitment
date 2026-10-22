@@ -1,0 +1,70 @@
+// The server GameTest report, on every loader's nodes (after ../enchanting-2's gradle/gametest-report.gradle). The run
+// writes a JUnit-style report to <node>/build/gametest-report.xml, and checkGameTestReport turns "nothing ran" into a
+// failure: a GameTest server exits non-zero on a failed test, but one that loads no tests (the GameTest mod missing, a
+// class left out of the fabric-gametest list, an import swap that missed) exits 0 too.
+def gameTestReport = new File(layout.buildDirectory.get().asFile.canonicalFile, 'gametest-report.xml')
+
+// Fabric's runner takes the file as a property. NeoForge's and Forge's GameTest servers are vanilla's
+// GameTestMainUtil, whose --report writes the same XML. On Forge the run task is the one forge/build.gradle names
+// (runGameTest is an alias there).
+def gameTestRunTask = 'runGameTest'
+if (project.extensions.findByName('loom') != null) {
+	loom.runs.matching { it.name == 'gameTest' }.configureEach {
+		property 'fabric-api.gametest.report-file', gameTestReport.absolutePath
+	}
+} else if (project.extensions.findByName('neoForge') != null) {
+	neoForge.runs.matching { it.name == 'gameTest' }.configureEach {
+		programArgument '--report'
+		programArgument gameTestReport.absolutePath
+	}
+} else if (project.hasProperty('forge_game_test_run_task')) {
+	minecraft.runs.matching { it.name == 'gameTestServer' }.configureEach {
+		args '--report', gameTestReport.absolutePath
+	}
+	gameTestRunTask = project.forge_game_test_run_task
+} else {
+	throw new GradleException("${project.path}: gametest-report.gradle needs Loom, ModDevGradle or ForgeGradle runs")
+}
+
+def checkGameTestReport = tasks.register('checkGameTestReport') {
+	def report = gameTestReport
+	def nodeName = project.path
+	doLast {
+		if (!report.isFile()) {
+			throw new GradleException("No GameTest report at ${report}: the GameTest server didn't run, or wrote none")
+		}
+		def suite = new groovy.xml.XmlSlurper().parse(report)
+		def cases = suite.'**'.findAll { it.name() == 'testcase' }
+		def failed = cases.findAll { !it.failure.isEmpty() || !it.error.isEmpty() }
+		// Vanilla's minecraft:always_pass runs on every GameTest server, so "any test ran" proves nothing: count ours.
+		def ours = cases.findAll { it.@name.text() ==~ /commitment[-_]gametest:.+/ }
+		logger.lifecycle("GameTests on ${nodeName}: ${ours.size()} of ours and ${cases.size() - ours.size()} others ran, " +
+			"${failed.size()} failed (${report})")
+		if (ours.isEmpty()) {
+			throw new GradleException("The GameTest report at ${report} has none of Commitment's tests (only " +
+				"${cases.collect { it.@name.text() }}): the GameTest mod didn't load")
+		}
+		if (!failed.isEmpty()) {
+			throw new GradleException("${failed.size()} GameTests failed on ${nodeName}: " +
+				failed.collect { it.@name.text() }.join(', '))
+		}
+	}
+}
+
+// matching, not named: ForgeGradle registers its run tasks after this script has run.
+def gameTestServers = gradle.sharedServices.registrations.getByName('gameTestServers').service
+tasks.matching { it.name == gameTestRunTask }.configureEach {
+	usesService gameTestServers
+	// A report left by an earlier run must never pass for this one.
+	doFirst {
+		if (gameTestReport.exists()) {
+			logger.lifecycle("Deleting the previous GameTest report ${gameTestReport} (${new Date(gameTestReport.lastModified())})")
+			// Fail closed: a report that can't be deleted (Windows: another process holds it) would pass this run.
+			if (!gameTestReport.delete()) {
+				throw new GradleException("Could not delete the previous GameTest report ${gameTestReport}; another " +
+					"process may hold it (a second build on this tree?). Refusing to run, so it can't pass for this run.")
+			}
+		}
+	}
+	finalizedBy checkGameTestReport
+}

@@ -443,15 +443,82 @@ place. Clock tests use the injected clock.
 
 ### Stage C: hooks, per node and loader (commit per step)
 
+**Owner rulings, session 4:** carry on into Stage C (game windows OK, one at a time); **port the GameTest harness to
+NeoForge and Forge first** (step C.0), so Proof 2 runs on all nine loader × node pairs.
+
+**Facts read for Stage C (2026-10-21, all four jars unless noted):**
+- The seed isn't in `level.dat` on 26.x: `WorldGenSettings` is saved data, `<world>/data/minecraft/world_gen_settings.dat`,
+  gzip NBT `{data:{seed:<long>,…}, DataVersion}` (read from the dev worlds on 26.1.2 and 26.3). `NbtIo`'s accounting
+  argument changes between 26.1.2 (`NbtAccounter.defaultQuota()`) and 26.2 (`unlimitedHeap()`), so common reads the
+  seed with its own small NBT reader, not through vanilla. Game rules are saved data too (`data/minecraft/game_rules.dat`).
+- `CommandStorage.get/set(Identifier, CompoundTag)`, `MinecraftServer.getCommandStorage/getPackRepository/
+  reloadResources/getWorldPath(LevelResource)` are the same on every node. Storage `commitment:guard` lives in
+  `<world>/data/commitment/command_storage.dat`.
+- Client gate: `WorldOpenFlows.openWorld(String, Runnable)` HEAD, before `createWorldAccess` takes the session lock.
+  Server gate: `Main.main` calls `levelStorageSource.validateAndCreateAccess(levelName)` once, before the level data
+  and datapacks load; a `@Redirect` of that call needs no MixinExtras. `Main.main` catches `Throwable` and returns, so a
+  refusal has to `System.exit(1)` after closing the access to give the non-zero exit.
+- Events (../enchanting-2, building on these loaders): Fabric `ServerTickEvents.END_SERVER_TICK`, `ServerLifecycleEvents`;
+  NeoForge `NeoForge.EVENT_BUS.addListener(ServerTickEvent.Post.class, …)`, `ServerAboutToStartEvent`; Forge 26.x
+  EventBus 7 `TickEvent.ServerTickEvent.Post.BUS.addListener(…)`, `ServerAboutToStartEvent.BUS`. Forge names a jar's
+  mixin configs in its manifest (`MixinConfigs`) and takes `--mixin.config` in dev runs.
+
+- [x] C.0 **GameTest harness on NeoForge and Forge** (owner, session 4), after ../enchanting-2 Phase 13C/13D.
+      - Server GameTests stay in `fabric/src/gametest/java` with Fabric's `@GameTest` and are loader-free otherwise
+        (`CommitmentGameTest` loses `FabricLoader`); a JUnit test fails on any other `net.fabricmc` import there.
+      - `fabric` hands out each node's Stonecutter-processed gametest dir as a `serverGameTestJava` artifact (as
+        common's `commonJava`), without `*ClientGameTest.java`. NeoForge and Forge copy it per node with a Gradle filter
+        that swaps the one import for `com.wulfic.commitment.gametest.GameTest`.
+      - `forgelike/gametest/java` (plain Java, no version blocks): the `GameTest` annotation (Fabric's attributes and
+        defaults; structure `commitment_gametest:empty`) and `GameTestDiscovery` (reads the `fabric-gametest` list from
+        Fabric's gametest `fabric.mod.json`, the one list every loader reads; a listed class with no tests fails).
+        `forgelike/gametest/resources/data/commitment_gametest/structure/empty.nbt` from ../enchanting-2 (8×8×8 air).
+      - `neoforge/src/gametest/java/.../NeoForgeGameTests` (`RegisterEvent` + `RegisterGameTestsEvent`; 26.3's `TestData`
+        takes a dimension) and `forge/src/gametest/java/.../ForgeGameTests` (`RegisterEvent` + an in-memory
+        `test_instance` datapack via `AddPackFindersEvent`), each in a `commitment_gametest` mod with its own mods.toml.
+      - Gradle on both: the `gametest` source set, a `gameTestServer` run with `--report build/gametest-report.xml`,
+        `runGameTest`, a guarded `clearGameTestRunDir` (only `<node>/build/run/gameTest`), `checkGameTestReport` (no test
+        cases or a failure → red), `check` depends on `runGameTest`.
+      - **Proof:** `:neoforge:<n>:runGameTest` and `:forge:<n>:runGameTest` on all three nodes: the report count equals
+        Fabric's, 0 failed. Mutations: the test inverted → red on each loader; the import swap removed → discovery fails.
+      **Rollback:** `git revert` of the C.0 commit; nothing outside the repo is touched.
+      **Done 2026-10-21:** `./gradlew build` exit 0 on all 12 nodes: **all nine GameTest servers "1 of ours and 1
+      others ran, 0 failed"** (the other is vanilla's `minecraft:always_pass`); JUnit common 207, fabric 12 per node, 0
+      failed or skipped. Mutations: the test inverted → red on `:fabric|neoforge|forge:26.2`, each through its report;
+      the GameTest mod left out of NeoForge's `loadedMods` → red ("none of Commitment's tests", while the server said "All
+      1 required tests passed"); the import swap removed (through the input map) → Forge can't compile the test; a
+      `FabricLoader` import and an unlisted class → `GameTestSourcesTest` 2 red. All restored and `cmp`-verified. Rung 3:
+      `scripts/checks/boot.txt` exit 0 on neoforge 26.1.2, forge 26.2, fabric 26.3 (their run configs changed); no
+      GameTest classes in those runs or in the jars. Three traps found on the way (gotchas.md): `always_pass`, filter
+      closures not being inputs, `stonecutterGenerateGametest`.
 - [ ] C.1 Heartbeat (sets `commitment:guard alive` every tick while the setup matches), and
       self-heal at server start (rebuild a missing piece, re-enable a disabled pack). GameTests
       from Proof 2.
+      **Design:** common `platform/Platform` (the loader seam: the mod list for `GameEnvironment`), set once by each
+      entrypoint; `server/CommitmentServer.started(server)` loads the lock (seed from the overworld) and, when committed,
+      `GuardPack.write` + re-selects `file/commitment_guard.zip` if it isn't; `tick(server)` sets `{alive:1b}` in storage
+      `commitment:guard` every tick while committed. GameTests: the storage holds `alive` after a tick of a committed
+      world; check.mcfunction's own lines, run as commands with a mock player, give no blindness with the heartbeat and
+      blindness without it; a deleted guard pack is rewritten at start.
 - [ ] C.2 World-open gate: scan, compare; a mismatch → the LockedScreen (client) or log and stop
       (server); a timer that has run out → lift. The gate passes `LockStore.load` the world's seed (read
       from `level.dat`, read-only) and the guard pack's lock id; without the seed, a world whose record
       and guard pack were both deleted can't be matched to its mirror (B.3).
+      **Design:** common `gate/WorldSeed` (JDK-only reader of `world_gen_settings.dat`, tested on real files from the
+      dev worlds) and `gate/WorldGate.evaluate(env, store, worldDir, clock)` → Uncommitted / Open / Locked(lines, timer) /
+      Lift / Failed(reason), pure and JUnit-tested. Mixins live in common (`commitment.mixins.json`): the client one at
+      `openWorld` HEAD runs the gate on a worker thread behind a "checking" screen (the scan and internet time must not
+      block the render thread), then re-enters `openWorld` past the gate, shows the locked screen, or lifts and opens.
+      The server one is the `@Redirect` above: a locked world logs `Commitment: setup changed since /commit, refusing to
+      load <world>` and each line, closes the access and exits 1. Fact first: the entrypoint (and so `Platform`) runs
+      before `Main.main` reaches the gate on every loader (boot-log order).
 - [ ] C.3 Commands per the spec, registered through the platform seam. Server GameTests: every
       transition, each message, the 60 s confirm expiry, a non-host refused.
+      **Design:** the Brigadier tree in common (`command/CommitmentCommands`), registered by Fabric's
+      `CommandRegistrationCallback`, NeoForge's and Forge's `RegisterCommandsEvent`. Allowed: the console, the integrated
+      server's own player, or permission level 4. Pending confirms per sender, 60 s. `/commit confirm` writes the record,
+      the mirror and the guard pack, then selects the pack and reloads, so the guard is live at once (the heartbeat
+      already is). `/unlock confirm` reads internet time off the server thread and applies the result on it.
 - [ ] C.4 The LockedScreen per node: diff, Back, start-unlock with confirm, countdown, cancel.
       It logs `Commitment: locked screen (<n> changes)`. Fabric client GameTest from Proof 6.
       NeoForge and Forge have no client GameTest, so `:<node>:runClient` on a disposable world,

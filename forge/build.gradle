@@ -38,6 +38,38 @@ repositories {
 	mavenCentral()
 }
 
+// The server GameTests (plan step C.0), as on NeoForge: Fabric's for this node, with the one GameTest import swapped
+// for ours (forgelike/gametest). Declared before the one-folder-per-source-set loop below, so it gets one too.
+sourceSets {
+	gametest {
+		compileClasspath += sourceSets.main.output
+		runtimeClasspath += sourceSets.main.output
+	}
+}
+configurations {
+	gametestImplementation.extendsFrom implementation
+	gametestRuntimeOnly.extendsFrom runtimeOnly
+	serverGameTestJava {
+		canBeResolved = true
+		canBeConsumed = false
+	}
+}
+def swapGameTestImports = tasks.register('swapGameTestImports', Sync) {
+	from configurations.serverGameTestJava
+	exclude '**/*ClientGameTest.java'
+	into layout.buildDirectory.dir('generated/serverGameTests')
+	// An input, so a changed swap reruns the copy: Gradle can't see inside the filter closure.
+	def swap = ['import net.fabricmc.fabric.api.gametest.v1.GameTest;': 'import com.wulfic.commitment.gametest.GameTest;']
+	inputs.property('importSwap', swap)
+	// trim: a Windows checkout ends the line with CR.
+	filter { String line -> swap.getOrDefault(line.trim(), line) }
+}
+sourceSets.gametest.java.srcDir(swapGameTestImports)
+sourceSets.gametest.java.srcDir(rootProject.file('forgelike/gametest/java'))
+sourceSets.gametest.resources.srcDir(rootProject.file('forgelike/gametest/resources'))
+// The test class list GameTestDiscovery reads: Fabric's GameTest mod's fabric.mod.json.
+sourceSets.gametest.resources.srcDir(rootProject.file('fabric/src/gametest/resources'))
+
 // One run root per loader and band (see fabric/build.gradle).
 def runRoot = rootProject.file("run/forge/${band}")
 
@@ -49,6 +81,12 @@ minecraft {
 		register('server') {
 			workingDir = new File(runRoot, "server")
 			args '--nogui', '--port', project.dev_server_port
+		}
+		// ./gradlew :forge:<node>:runGameTest (an alias below), as on the other loaders: a GameTest server that runs
+		// every server GameTest and exits. ForgeGradle makes one run task per source set; runGametestGameTestServer is
+		// this one on the gametest classpath. Its world is rebuilt by every run (clearGameTestRunDir).
+		register('gameTestServer') {
+			workingDir = layout.buildDirectory.dir('run/gameTest').get().asFile
 		}
 	}
 }
@@ -68,6 +106,7 @@ dependencies {
 	compileOnly project(common)
 	commonJava project(path: common, configuration: 'commonJava')
 	commonResources project(path: common, configuration: 'commonResources')
+	serverGameTestJava project(path: ":fabric:${stonecutter.current.project}", configuration: 'serverGameTestJava')
 }
 
 // The dev server refuses to start without eula.txt. Written only when absent: never overwrites a file someone set.
@@ -111,6 +150,50 @@ processResources {
 		expand properties
 	}
 }
+
+// The GameTest mod's data (the empty structure) needs its own pack.mcmeta, for the same reason.
+tasks.named('processGametestResources', ProcessResources) {
+	def packFormat = project.property("forge_pack_format.$band")
+	inputs.property "packFormat", packFormat
+	filesMatching("pack.mcmeta") {
+		expand packFormat: packFormat
+	}
+}
+
+// Same name on every loader: :forge:<node>:runGameTest. gametest-report.gradle hooks the run task itself.
+ext.forge_game_test_run_task = 'runGametestGameTestServer'
+tasks.register('runGameTest') {
+	group = 'verification'
+	description = 'Runs every server GameTest on this node (the gameTestServer run on the gametest classpath)'
+	dependsOn forge_game_test_run_task
+}
+
+// A fresh GameTest world every run (see neoforge/build.gradle). Only <node>/build/run/gameTest is ever deleted.
+def buildRoot = layout.buildDirectory.get().asFile.canonicalFile
+def gameTestRunDir = new File(buildRoot, 'run/gameTest').canonicalFile
+def clearGameTestRunDir = tasks.register('clearGameTestRunDir') {
+	doLast {
+		// Fail closed: only that one direct child of <node>/build/run/ is ever deleted.
+		if (gameTestRunDir.parentFile != new File(buildRoot, 'run').canonicalFile || gameTestRunDir.name != 'gameTest') {
+			throw new GradleException("Refusing to delete ${gameTestRunDir}: not ${buildRoot}/run/gameTest")
+		}
+		if (gameTestRunDir.exists()) {
+			logger.lifecycle("Clearing the GameTest run dir ${gameTestRunDir} (rebuilt by every run)")
+			if (!gameTestRunDir.deleteDir()) {
+				throw new GradleException("Could not clear ${gameTestRunDir}; a server from the last run may still hold it")
+			}
+		}
+		gameTestRunDir.mkdirs()
+	}
+}
+tasks.matching { it.name == forge_game_test_run_task }.configureEach {
+	dependsOn clearGameTestRunDir
+}
+// GameTests are part of `check`, as on the other loaders.
+tasks.named('check') {
+	dependsOn 'runGameTest'
+}
+apply from: rootProject.file('gradle/gametest-report.gradle')
 
 tasks.withType(JavaCompile).configureEach {
 	it.options.release = 25

@@ -11,3 +11,6 @@
 
 # The guard pack's golden files are compared byte for byte with what the mod writes (LF)
 common/src/test/resources/guard-pack/** text eol=lf
+# NBT fixtures and test structures are gzip: never touch their bytes
+*.nbt           binary
+*.dat           binary

@@ -9,3 +9,15 @@ plugins {
 // The band the sources are checked in for. Switching it rewrites the `//? if` blocks in src/; Stonecutter edits
 // this line itself.
 stonecutter.active "26.1.2"
+
+// At most this many GameTest servers at once, across every loader and node (gradle/gametest-report.gradle makes each
+// run task hold a slot). Nine exist; unbounded, ../enchanting-2 ran its machine out of commit memory with eleven
+// (its gotchas.md 2026-10-21). Override with -Pgametest_max_parallel=<n>.
+abstract class GameTestServerSlots implements BuildService<org.gradle.api.services.BuildServiceParameters.None> {}
+def gameTestMaxParallel = providers.gradleProperty('gametest_max_parallel').map { it as int }.getOrElse(3)
+if (gameTestMaxParallel < 1) {
+	throw new GradleException("gametest_max_parallel must be at least 1, not ${gameTestMaxParallel}")
+}
+gradle.sharedServices.registerIfAbsent('gameTestServers', GameTestServerSlots) {
+	maxParallelUsages = gameTestMaxParallel
+}

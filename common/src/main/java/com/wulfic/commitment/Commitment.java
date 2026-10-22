@@ -1,5 +1,6 @@
 package com.wulfic.commitment;
 
+import java.util.Optional;
 import net.minecraft.SharedConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -9,6 +10,8 @@ public final class Commitment {
 	public static final String MOD_ID = "commitment";
 	public static final Logger LOGGER = LoggerFactory.getLogger(MOD_ID);
 
+	private static volatile String loadedLine;
+
 	private Commitment() {
 	}
 
@@ -17,7 +20,14 @@ public final class Commitment {
 	 * so a jar that loaded on the wrong loader or Minecraft version shows it in the log.
 	 */
 	public static void logLoaded(String modVersion, String loader, String loaderVersion) {
-		LOGGER.info(loadedLine(modVersion, loader, loaderVersion, SharedConstants.getCurrentVersion().name()));
+		String line = loadedLine(modVersion, loader, loaderVersion, SharedConstants.getCurrentVersion().name());
+		loadedLine = line;
+		LOGGER.info(line);
+	}
+
+	/** The boot line once an entrypoint has logged it: how a GameTest on any loader sees that the mod ran there. */
+	public static Optional<String> loaded() {
+		return Optional.ofNullable(loadedLine);
 	}
 
 	static String loadedLine(String modVersion, String loader, String loaderVersion, String minecraft) {

@@ -293,3 +293,17 @@ commit's lift never collides with an earlier one's leftovers.
 **Rejected:** Per-file deletion (the re-lock above). Hard delete (owner preferred the soft delete; the rename
 also gives the failed-midway rollback something to move back).
 **Affects:** common/.../lock/LockLifter.java, GuardPack.java, TODO.md B.6
+
+## 2026-10-21 — Commitment: server GameTests on NeoForge and Forge too, with enchanting-2's harness
+**Context:** Proof 2 wants server GameTests on every loader; only Fabric had a harness. Offered the owner Fabric
+GameTests + dev-server smokes on the other two, or porting ../enchanting-2's NeoForge/Forge harness first.
+**Choice:** Owner: port the harness now (TODO.md C.0). The tests stay in `fabric/src/gametest` with Fabric's
+`@GameTest`; NeoForge and Forge compile each node's Stonecutter-processed copy with that one import swapped by a
+Gradle filter for our own annotation, and register them (NeoForge: `RegisterEvent` + `RegisterGameTestsEvent`; Forge:
+`RegisterEvent` + an in-memory `test_instance` pack). The `fabric-gametest` list in Fabric's gametest
+`fabric.mod.json` is the one test list.
+**Why:** One set of tests, run by each loader's own GameTest server, so loader glue (events, commands, mixin configs)
+is tested where it differs. Taking the node-processed copy from Fabric keeps `//? if` blocks right on every node.
+**Rejected:** Smokes only on NeoForge/Forge (owner's call). A second copy of the tests per loader (drifts). Our own
+annotation on Fabric too (Fabric's runner only reads its own).
+**Affects:** fabric/neoforge/forge build.gradle, forgelike/gametest/, neoforge|forge/src/gametest/

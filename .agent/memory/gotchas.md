@@ -150,3 +150,18 @@ generator's LF text, so a fresh clone on Windows would go red.
 **Fix:** `common/src/test/resources/guard-pack/** text eol=lf` in `.gitattributes`. Do the same for any new fixture
 that's compared byte for byte.
 **Affects:** .gitattributes, common/src/test/resources/guard-pack/
+
+## 2026-10-21 — GameTest harness traps: `always_pass`, filter closures, and Stonecutter's per-source-set tasks
+**Symptom:** Three ways the C.0 harness looked green while proving nothing. (1) The report check ported from
+../enchanting-2 ("the report has test cases") passed with the GameTest mod not loaded at all: the server printed
+"All 1 required tests passed :)". (2) With the import swap's filter logic broken, Forge's GameTests still compiled:
+`swapGameTestImports` was UP-TO-DATE and kept its old output. (3) NeoForge 26.3 compiled a stale copy of the shared
+GameTest (the old `FabricLoader` one) although the source had changed.
+**Cause:** (1) Vanilla registers `minecraft:always_pass` on every GameTest server, so a report always has a case.
+(2) Gradle doesn't track what's inside a `filter { }` closure. (3) Stonecutter generates each source set with its own
+task: `stonecutterGenerate` is main's only; the gametest set's is `stonecutterGenerateGametest`.
+**Fix:** (1) `checkGameTestReport` counts only `commitment[-_]gametest:*` cases and fails on zero (mutation: the
+GameTest mod left out of `loadedMods` → red). (2) The swap is a map declared with `inputs.property('importSwap', …)`
+and the closure reads the map (mutation through the map → recompiles → red). (3) The `serverGameTestJava` artifact is
+`builtBy stonecutterGenerateGametest`.
+**Affects:** gradle/gametest-report.gradle, fabric/neoforge/forge build.gradle

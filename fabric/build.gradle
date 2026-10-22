@@ -87,6 +87,20 @@ fabricApi {
 	}
 }
 
+// The server GameTests as Stonecutter wrote them for this node, for NeoForge's and Forge's GameTest mods of the same
+// node (plan step C.0): they compile this directory with the one GameTest import swapped.
+configurations {
+	serverGameTestJava {
+		canBeResolved = false
+		canBeConsumed = true
+	}
+}
+sourceSets.gametest.java.srcDirs.each { dir ->
+	// Stonecutter generates each source set with its own task; stonecutterGenerate is main's only.
+	artifacts.add('serverGameTestJava', dir) { builtBy tasks.named('stonecutterGenerateGametest') }
+}
+apply from: rootProject.file('gradle/gametest-report.gradle')
+
 dependencies {
 	// The node's band is the Minecraft version; the rest is per band in gradle.properties.
 	minecraft "com.mojang:minecraft:${band}"
@@ -155,6 +169,9 @@ test {
 	systemProperty "commitment.repoRoot", rootDir.absolutePath
 	inputs.files(rootProject.file("LICENSE"), rootProject.file("README.md"), rootProject.file("gradle.properties"))
 		.withPropertyName("repoDocs").withPathSensitivity(PathSensitivity.RELATIVE)
+	// GameTestSourcesTest reads the GameTest sources and their fabric.mod.json.
+	inputs.dir(rootProject.file("fabric/src/gametest")).withPropertyName("gameTestSources")
+		.withPathSensitivity(PathSensitivity.RELATIVE)
 	// BandLabelTest: the jar this node ships, and the Minecraft version it compiles against.
 	systemProperty "commitment.jarName", tasks.named('jar', Jar).get().archiveFileName.get()
 	systemProperty "commitment.minecraft", band

@@ -1,0 +1,17 @@
+# The GameTest mod on Forge (plan step C.0), as on NeoForge: Fabric's commitment-gametest, renamed because Forge mod
+# ids can't hold '-'. GameTest runs only (forge/build.gradle); never in a shipped jar.
+modLoader = "javafml"
+loaderVersion = "[1,)"
+license = "MIT"
+
+[[mods]]
+modId = "commitment_gametest"
+version = "0.0.0"
+displayName = "Commitment: game tests"
+
+[[dependencies.commitment_gametest]]
+modId = "commitment"
+mandatory = true
+versionRange = "[0,)"
+ordering = "AFTER"
+side = "BOTH"
