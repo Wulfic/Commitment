@@ -4,22 +4,27 @@
 > cheap to read at the start of every session. History belongs in `decisions.md` and
 > `gotchas.md`; this file only answers "where am I right now?".
 
-**Last updated:** 2026-10-22 (session 7, C.2a done)
+**Last updated:** 2026-10-22 (session 7 end: C.3b done)
 **Branch:** `main`, always (decisions.md 2026-10-21). Push each green stage (owner, 2026-10-21).
 
 ## Where we are
 **Commitment**: locks a world's setup after `/commit`, with a 24-hour unlock. Plan in `TODO.md` (Tier 2).
-- **Stages 0, A, B done.** Stage C: C.0, C.1, C.2 and **C.2a (Fabric 1.21.11 node)** committed, not pushed. 13 nodes:
-  common + fabric on 1.21.11/26.1.2/26.2/26.3, neoforge + forge on the three 26.x. Common 245 JUnit per node, fabric 12,
-  GameTests 4 of ours on all ten GameTest nodes.
-- Owner rulings in decisions.md: lift is all-or-nothing and renames to `*.<lockId>.lifted`; a locked dedicated server
-  unlocks with `-Dcommitment.unlock=start|cancel`; the dev mirror override works in development runs only; world game
-  settings are reverted live (C.6); E.1 runs the 1.21.11 copy as a Loom dev client, 26.x on premade Modrinth packs.
+- **Stages 0, A, B done.** Stage C committed, **not pushed**: C.0, C.1, C.2, C.2a (Fabric 1.21.11), C.2b (save
+  safety: `FileWritersTest` + `scripts/world-audit.sh` in every smoke; bullet 3 waits for E.1), C.3a (commands in
+  common), C.3b (registered on all loaders, `CommandsGameTest` green on all ten GameTest nodes). 13 nodes; common 266
+  JUnit per node, fabric 12, GameTests 5 of ours on all ten.
+- Owner rulings in decisions.md, incl. session 7: E.1 runs the 1.21.11 copy as a Loom dev client, 26.x on premade
+  Modrinth packs.
 
-## Next
-- **C.2b save safety**, then C.3 (`/commit`; redo C.1's guard-pack smokes with it: a golden-pack-only world is now
-  refused by the gate), C.4 LockedScreen, C.5, C.6. Push when Stage C is green (no CI: a push can't release).
-- Stage C still needs a real-server smoke tool (`../the-continent/tools/server_smoke.py`) for Proof 4 and 7.
+## Next: C.3c (plan in TODO.md C.3)
+1. `WorldGateClientGameTest`: replace its hand-written `commit()` with real `/commit` + `/commit confirm` from chat
+   (`client.player.connection.sendCommand`, wait ~60 ticks between, then wait for `data/commitment.dat`), quit,
+   reopen → must open (proves the commit-time scan equals the gate's). Run on all 4 Fabric nodes.
+2. `scripts/commit-smoke.sh` (model: `guard-pack-smoke.sh`, no golden pack; lock id from the zip's commitment.lock;
+   guarded cleanup with a `--self-test`), checks `commit-flow.txt`, `guard-live.txt` (boot 2: `@expect Commitment:
+   world is committed and its setup matches`, heartbeat, pack enabled, `@reject` guard line), then
+   `guard-disable.txt` + `guard-reenable.txt`. Retire `guard-pack.txt` (a golden-only world is refused now). All ten
+   pairs. Then C.4 to C.6; push when Stage C is green.
 - Noted: "Deprecated Gradle features" comes from a task at execution time; find which before Gradle 10.
 
 ## How to run things
