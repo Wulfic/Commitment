@@ -789,6 +789,21 @@ NeoForge and Forge first** (step C.0), so Proof 2 runs on all nine loader × nod
         `scripts/checks/commit-flow.txt` (`@expect Commitment: world committed`, `@expect unlock available at`, `@expect
         unlock cancelled`), then C.1's redo: `guard-live.txt` (boot 2: pack enabled, `{alive: 1b}`, `@reject` the guard
         line), `guard-disable.txt` + `guard-reenable.txt` on the committed world. All ten loader × node pairs.
+      **C.3a done, session 7:** `command/Confirmations`, `command/CommitActions` (the server-free work, as `ServerGate`'s
+      `decide`), `command/CommitmentCommands` (Brigadier + a daemon thread + `server.execute`; `WORKING` set per world;
+      `useTestClocks` refused outside development), `client/ClientGameDir` (ClientGate uses it), `ServerGate.serverDir()`,
+      `CommitmentServer.environment(server)`, `Manifest.counts()`. **Fact:** `GameTestServer.isDedicatedServer()` is
+      `false` (javap, 1.21.11 and 26.3), so the client/server choice is `Platform.Loader.physicalClient()` (Fabric
+      `EnvType.CLIENT`, NeoForge `FMLEnvironment.getDist()`, Forge `FMLEnvironment.dist`, read from the pinned jars).
+      JUnit: `CommitActionsTest` 12 (incl. "what /commit confirm locks, the gate opens"), `ConfirmationsTest` 5,
+      `ManifestCountsTest` 2, `CommitmentCommandsTest` 1. **Mutations, each red and restored (`cmp`):** window `>` → `>=`;
+      a confirm not used up; the window not per world; the guard pack not written; a second commit allowed; the timer
+      not saved; the cancel not saved; "lifted" in a running world; datapacks always listed; `/commit` not asking; the
+      test-clock guard off. (A first mutation runner driving Gradle from Python's `subprocess` reported every mutation
+      as "0 red": its output was unreadable, so those runs were redone from Git Bash; gotchas.md.) The gate refactors
+      (`ClientGameDir`, `serverDir()`) are behaviour-identical; C.3c's smokes and client test run them live.
+      `./gradlew build` exit 0 on 13 nodes: common **266** per node, fabric 12, GameTests 4 of ours on all ten, no javac
+      warnings.
       **Not doing in C.3:** world settings (C.6), the LockedScreen (C.4), `locked-boot` from a config change (C.5).
       **Blast radius:** `/commit confirm` writes Commitment's three files in dev worlds and `run/<l>/<n>/mirror` only;
       the smoke wrapper removes only files carrying the marker and the run's lock id, after its own refusal on leftovers.

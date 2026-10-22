@@ -44,7 +44,7 @@ public final class ClientGate {
 
 	public static void check(WorldOpenFlows flows, Minecraft minecraft, String levelId, Runnable onCancel) {
 		Path world = minecraft.getLevelSource().getBaseDir().resolve(levelId).toAbsolutePath().normalize();
-		GameEnvironment env = Platform.environment(GameEnvironment.Side.CLIENT, minecraft.gameDirectory.toPath().toAbsolutePath(), world);
+		GameEnvironment env = Platform.environment(GameEnvironment.Side.CLIENT, ClientGameDir.get(), world);
 		minecraft.setScreenAndShow(new GenericMessageScreen(Component.literal("Commitment: checking this world's setup...")));
 		CompletableFuture.supplyAsync(() -> WorldGate.evaluate(env, CommitmentServer.store(), new InternetTime()),
 						task -> Thread.ofPlatform().daemon().name("Commitment world gate").start(task))

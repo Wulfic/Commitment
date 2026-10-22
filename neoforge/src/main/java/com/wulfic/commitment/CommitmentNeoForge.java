@@ -49,6 +49,11 @@ public final class CommitmentNeoForge {
 		}
 
 		@Override
+		public boolean physicalClient() {
+			return FMLEnvironment.getDist().isClient();
+		}
+
+		@Override
 		public List<GameEnvironment.ModFile> mods() {
 			return ModList.get().getMods().stream().map(NeoForgePlatform::modFile).toList();
 		}

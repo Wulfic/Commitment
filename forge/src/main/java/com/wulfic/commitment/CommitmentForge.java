@@ -46,6 +46,11 @@ public final class CommitmentForge {
 		}
 
 		@Override
+		public boolean physicalClient() {
+			return FMLEnvironment.dist.isClient();
+		}
+
+		@Override
 		public List<GameEnvironment.ModFile> mods() {
 			return ModList.getMods().stream().map(ForgePlatform::modFile).toList();
 		}

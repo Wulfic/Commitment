@@ -48,13 +48,18 @@ public final class ServerGate {
 	 */
 	public static void atServerStart(LevelStorageSource.LevelStorageAccess access) {
 		Path world = access.getLevelPath(LevelResource.ROOT).toAbsolutePath().normalize();
-		GameEnvironment env = Platform.environment(GameEnvironment.Side.DEDICATED_SERVER, Path.of("").toAbsolutePath(), world);
+		GameEnvironment env = Platform.environment(GameEnvironment.Side.DEDICATED_SERVER, serverDir(), world);
 		Outcome outcome = decide(env, CommitmentServer.store(), new InternetTime(), System.getProperty(UNLOCK_FLAG), ZoneId.systemDefault());
 		log(outcome);
 		if (!outcome.load()) {
 			access.safeClose();
 			System.exit(1);
 		}
+	}
+
+	/** A dedicated server's directory ({@code server.properties}, {@code config/}): the one it was started in. */
+	public static Path serverDir() {
+		return Path.of("").toAbsolutePath();
 	}
 
 	/** Logs the outcome: a refusal as an error, the rest as info. */

@@ -1,10 +1,13 @@
 package com.wulfic.commitment.server;
 
 import com.wulfic.commitment.Commitment;
+import com.wulfic.commitment.client.ClientGameDir;
+import com.wulfic.commitment.gate.ServerGate;
 import com.wulfic.commitment.lock.GuardPack;
 import com.wulfic.commitment.lock.LockStore;
 import com.wulfic.commitment.lock.MirrorDir;
 import com.wulfic.commitment.lock.WorldLock;
+import com.wulfic.commitment.manifest.GameEnvironment;
 import com.wulfic.commitment.platform.Platform;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -44,6 +47,18 @@ public final class CommitmentServer {
 
 	public static Path worldDir(MinecraftServer server) {
 		return server.getWorldPath(LevelResource.ROOT).toAbsolutePath().normalize();
+	}
+
+	/**
+	 * The setup {@code /commit} locks, read from where the world-open gate will read it: the client's game dir on the
+	 * integrated server ({@link ClientGameDir}, referenced only there, so a server never loads a client class), the
+	 * server's own dir otherwise ({@link ServerGate#serverDir()}).
+	 */
+	public static GameEnvironment environment(MinecraftServer server) {
+		if (Platform.loader().physicalClient()) {
+			return Platform.environment(GameEnvironment.Side.CLIENT, ClientGameDir.get(), worldDir(server));
+		}
+		return Platform.environment(GameEnvironment.Side.DEDICATED_SERVER, ServerGate.serverDir(), worldDir(server));
 	}
 
 	/** After the worlds and datapacks have loaded. */

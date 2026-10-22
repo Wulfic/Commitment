@@ -20,6 +20,12 @@ public final class Platform {
 		/** A development run (Loom, ModDevGradle, ForgeGradle), not a released game. Gates the dev-only overrides. */
 		boolean development();
 
+		/**
+		 * The game runs on a physical client, so the server here is the integrated one. Not the same as
+		 * {@code !server.isDedicatedServer()}: a GameTest server says it isn't dedicated and has no client either.
+		 */
+		boolean physicalClient();
+
 		/** Every mod the loader runs. A mod without a jar of its own (nested, built in) is locked by version only. */
 		List<GameEnvironment.ModFile> mods();
 	}

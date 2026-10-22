@@ -217,3 +217,13 @@ agent's quoted heredoc (`r'(\.…'` arrived as `r'(\.…'`).
 **Fix:** build backslashes in Python with `chr(92)`, and have every mutation script `assert s.count(old) == 1` and
 print "mutated" before the run, so a mutation that didn't apply can't read as a pass.
 **Affects:** mutation checks of any script or source holding backslashes
+
+## 2026-10-22 — Drive Gradle from Git Bash, not from Windows Python's subprocess
+**Symptom:** a mutation runner in Python (`subprocess.run(['bash', './gradlew', ...], capture_output=True)`) reported
+`exit=1, red=0` for all ten C.3a mutations. Run by hand from Git Bash, the first one was plainly red
+(`aConfirmWithin60SecondsGoesThroughOnce` FAILED).
+**Cause:** not pinned down: `bash` resolved to Git Bash, yet the captured output never matched the `... FAILED` lines.
+Reading a mutation result through a layer whose output can't be seen is how "0 red" turns into a false pass.
+**Fix:** Python only edits files (asserting each edit applied); Gradle runs from a Git Bash loop that writes each run's
+log to a file, and the verdict is grepped from that log.
+**Affects:** any mutation-check script
