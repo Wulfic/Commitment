@@ -43,6 +43,15 @@ jar --create --no-manifest --file "$ZIP" -C "$GOLDEN" .
 written=$(sha256sum "$ZIP" | cut -d' ' -f1)
 echo "guard-pack-smoke: wrote $ZIP ($written)"
 
+GOLDEN_LOCK=$(sed -n 's/^lock=//p' "$GOLDEN/commitment.lock" | tr -d '\r')
+
+# A guard pack of Commitment's for the golden lock: its commitment.lock carries the marker and that lock id.
+is_golden_guard() {
+	local lock
+	lock=$(unzip -p -- "$1" commitment.lock 2> /dev/null | tr -d '\r') || return 1
+	grep -qx 'marker=CMTGUARD 1' <<< "$lock" && grep -qx "lock=$GOLDEN_LOCK" <<< "$lock"
+}
+
 # A lock record or mirror of Commitment's: gzip whose content starts with its CMTLOCK marker.
 is_lock_file() {
 	[[ "$(gzip -dc -- "$1" 2> /dev/null | head -c 7)" == "CMTLOCK" ]]
@@ -54,6 +63,10 @@ cleanup() {
 		if [[ "$(sha256sum "$ZIP" | cut -d' ' -f1)" == "$written" ]]; then
 			rm -- "$ZIP"
 			echo "guard-pack-smoke: removed $ZIP"
+		elif is_golden_guard "$ZIP"; then
+			# The world-open gate replaces a pack whose bytes aren't its own generator's (the jar tool's zip isn't).
+			rm -- "$ZIP"
+			echo "guard-pack-smoke: removed $ZIP (the mod rewrote it, for the golden lock $GOLDEN_LOCK)"
 		else
 			echo "guard-pack-smoke: $ZIP changed during the run; leaving it for you to look at" >&2
 		fi
@@ -91,7 +104,7 @@ if [[ $status -eq 0 ]] && ! compgen -G "$MIRROR/*.dat" > /dev/null; then
 	echo "guard-pack-smoke: FAIL: no lock mirror in $MIRROR; the dev run's -Dcommitment.mirrorDir wasn't honoured" >&2
 	status=1
 fi
-REAL_MIRROR=${LOCALAPPDATA:-}/Commitment/locks/$(sed -n 's/^lock=//p' "$GOLDEN/commitment.lock" | tr -d '\r').dat
+REAL_MIRROR=${LOCALAPPDATA:-}/Commitment/locks/$GOLDEN_LOCK.dat
 if [[ -n "${LOCALAPPDATA:-}" && -e "$REAL_MIRROR" ]]; then
 	echo "guard-pack-smoke: FAIL: $REAL_MIRROR exists: a dev run wrote into your own user data dir. Left for you to look at." >&2
 	status=1

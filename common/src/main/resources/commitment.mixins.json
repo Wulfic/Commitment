@@ -1,0 +1,15 @@
+{
+	"required": true,
+	"minVersion": "0.8",
+	"package": "com.wulfic.commitment.mixin",
+	"compatibilityLevel": "JAVA_21",
+	"server": [
+		"MainMixin"
+	],
+	"client": [
+		"WorldOpenFlowsMixin"
+	],
+	"injectors": {
+		"defaultRequire": 1
+	}
+}

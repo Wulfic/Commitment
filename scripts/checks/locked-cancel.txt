@@ -1,0 +1,8 @@
+# C.2, boot 3 of 3 (after locked-unlock.txt, through the wrapper): the timer boot 2 saved is there, and
+# -Dcommitment.unlock=cancel stops it. Still refused.
+@gradle -Pcommitment.unlock=cancel
+@exits-nonzero
+@allow-error Commitment: setup changed since /commit, refusing to load world
+@expect Commitment: setup changed since /commit, refusing to load world
+@expect Commitment: unlock cancelled; the world stays committed
+@reject Done \(

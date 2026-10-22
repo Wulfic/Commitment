@@ -12,6 +12,10 @@ description = '''
 Commit a world to the mods, resource packs and config it was played with. Changing them later takes a 24-hour unlock.
 '''
 
+# NeoForge reads its mixin configs from here; Forge reads them from the jar manifest (forge/build.gradle).
+[[mixins]]
+config = "commitment.mixins.json"
+
 [[dependencies.commitment]]
 modId = "neoforge"
 type = "required"

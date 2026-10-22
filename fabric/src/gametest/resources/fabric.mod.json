@@ -10,7 +10,8 @@
 			"com.wulfic.commitment.gametest.GuardGameTest"
 		],
 		"fabric-client-gametest": [
-			"com.wulfic.commitment.gametest.CommitmentClientGameTest"
+			"com.wulfic.commitment.gametest.CommitmentClientGameTest",
+			"com.wulfic.commitment.gametest.WorldGateClientGameTest"
 		]
 	},
 	"depends": {

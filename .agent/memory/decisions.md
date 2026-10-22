@@ -331,3 +331,16 @@ Forge `!FMLEnvironment.production`, read from the pinned jars) gates it; outside
 **Rejected:** Leaving it on as "same bar as deleting the mirror" (deleting a file in a hidden user dir is harder than a
 launcher's JVM-args box). Keying it to a Gradle-only property name (a property is still settable by a player).
 **Affects:** common/.../lock/MirrorDir.java, platform/Platform.java, each loader's Platform, scripts/guard-pack-smoke.sh
+
+## 2026-10-22 — Commitment also ships a Fabric 1.21.11 node, and every node gets a real-pack test
+**Context:** Stage E planned to run Commitment on a copy of the owner's real instance, but that instance (82 mods,
+305 configs) is Minecraft 1.21.11 and Commitment shipped 26.x only.
+**Choice:** Owner: add Fabric 1.21.11 (Fabric only), run live on a copy of that instance, and for each 26.x node test
+on a simple or premade vanilla+ pack. Added as TODO C.2a (after C.2, before C.3, so the rest of Stage C is built
+against it) and C.2b (save safety: one audited set of file writers, a world-dir audit in the smokes, zero diffs on
+every pack).
+**Why:** "We have to be 100% sure we don't accidentally ruin people's saves." A false lock on a real pack, or a
+stray write, is the failure that matters, and only real packs show which files mods rewrite by themselves.
+**Rejected:** A scanner-only run on the 1.21.11 copy (doesn't exercise the mod). Retrofitting 1.21.11 after Stage C
+(every hook would have to be written twice).
+**Affects:** settings.gradle, gradle.properties, common + fabric nodes, README band statement, TODO C.2a/C.2b/E.1

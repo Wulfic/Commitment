@@ -73,6 +73,10 @@ sourceSets.gametest.resources.srcDir(rootProject.file('fabric/src/gametest/resou
 // One run root per loader and band (see fabric/build.gradle).
 def runRoot = rootProject.file("run/forge/${band}")
 
+// Forge reads a jar's mixin configs from its manifest (the jar task, below) and a dev run's from --mixin.config: its
+// mods.toml has no mixins list (../enchanting-2 gotchas, "Forge's Mixin 0.8.7").
+def mixinConfigs = ['commitment.mixins.json']
+
 minecraft {
 	runs {
 		register('client') {
@@ -91,6 +95,11 @@ minecraft {
 		// Development writes its lock mirrors here, never into the developer's own user data dir (MirrorDir.OVERRIDE).
 		configureEach {
 			systemProperty 'commitment.mirrorDir', new File(runRoot, "mirror").absolutePath
+			// `-Pcommitment.unlock=start` (dev-server-smoke.sh's @gradle): the dedicated server's unlock flag (ServerGate).
+			if (providers.gradleProperty('commitment.unlock').isPresent()) {
+				systemProperty 'commitment.unlock', providers.gradleProperty('commitment.unlock').get()
+			}
+			mixinConfigs.each { args "--mixin.config=${it}" }
 		}
 	}
 }
@@ -209,6 +218,12 @@ java {
 
 	sourceCompatibility = JavaVersion.VERSION_25
 	targetCompatibility = JavaVersion.VERSION_25
+}
+
+tasks.named('jar', Jar) {
+	manifest {
+		attributes('MixinConfigs': mixinConfigs.join(','))
+	}
 }
 
 tasks.named('sourcesJar', Jar) {

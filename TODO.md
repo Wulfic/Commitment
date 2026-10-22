@@ -530,7 +530,7 @@ NeoForge and Forge first** (step C.0), so Proof 2 runs on all nine loader × nod
       exit 0, common 231 per node, fabric 12, GameTests 4 of ours on all nine, 0 warnings.
       Rung 3 after the fix, one pair per loader (`development()` is per-loader code): fabric 26.1.2, neoforge 26.2,
       forge 26.3, each `guard-pack.txt` and disable + re-enable exit 0, the mirror in `run/`, none in `%LOCALAPPDATA%`.
-- [ ] C.2 World-open gate: scan, compare; a mismatch → the LockedScreen (client) or log and stop
+- [x] C.2 World-open gate: scan, compare; a mismatch → the LockedScreen (client) or log and stop
       (server); a timer that has run out → lift. The gate passes `LockStore.load` the world's seed (read
       from `level.dat`, read-only) and the guard pack's lock id; without the seed, a world whose record
       and guard pack were both deleted can't be matched to its mirror (B.3).
@@ -554,6 +554,89 @@ NeoForge and Forge first** (step C.0), so Proof 2 runs on all nine loader × nod
       fabric.mod.json, neoforge.mods.toml `[[mixins]]`, Forge's `MixinConfigs` manifest + `--mixin.config` run args.
       **Corrected session 5 (javap):** `Minecraft.setScreen` exists on 26.1.2 only; 26.2+ moved it to `Minecraft.gui.setScreen`.
       `Minecraft.setScreenAndShow(Screen)` is on all three nodes (vanilla uses it for its own progress screens): use that.
+      **Session 5, in progress (uncommitted):** server side done: `gate/ServerGate` (pure `decide` + `atServerStart`,
+      exit 1 on refusal), `WorldGate.lift` (one lift for both sides, through `LockLifter`'s own refusal),
+      `mixin/MainMixin` (`@Redirect` of `validateAndCreateAccess` in `Main.main`), `commitment.mixins.json` (`server`
+      list, `JAVA_21`) registered in fabric.mod.json, neoforge.mods.toml `[[mixins]]`, Forge's `MixinConfigs` manifest
+      + `--mixin.config` run args. Each loader's runs forward `-Pcommitment.unlock=<v>`. `dev-server-smoke.sh`: new
+      `@exits-nonzero` (a refusal; a timeout still fails; no "Done (" required) and `@gradle <arg>`; self-test 21 cases,
+      each new branch mutation-checked. `guard-pack-smoke.sh` also removes a guard zip the mod rewrote for the golden lock.
+      **Runs:** `./gradlew build` exit 0 (before the script and gradle-property changes): common **242** JUnit per node
+      (`ServerGateTest` 11), fabric 12, GameTests 4 of ours on all nine, 0 warnings; Forge jar manifest
+      `MixinConfigs: commitment.mixins.json`. Mutations: refusal → load, timer save removed, a failed lift reported as
+      lifted → each red. A pre-check in `WorldGate.lift` that duplicated `LockLifter.lift`'s refusal survived its mutation,
+      so it was removed. **Rung 3, fabric 26.3:** `guard-pack-smoke.sh locked-boot.txt locked-unlock.txt locked-cancel.txt`
+      exit 0: refused with exit 1 and no "Done (" each boot, the damaged-record line, `unlock available at … (24h)`, then
+      `unlock cancelled`. Fact: on Fabric the entrypoint's boot line comes before the gate (Platform installed in time).
+      **Left for C.2:** full `./gradlew build` again; the three locked boots on neoforge and forge (all nodes, check the
+      boot-line order there); the client gate (`.agent/drafts/C.2/ClientGate.java.txt`, reviewed draft; plus a
+      `WorldOpenFlowsMixin` HEAD inject on `openWorld(String, Runnable)` with `ClientGate.consumePass`, a `client` list in
+      the mixin config) and a Fabric client GameTest (create, close, commit via `LockStore`, reopen opens; add a config
+      file, `openWorld` again → `AlertScreen` + `Commitment: locked screen (1 changes)`). Then commit C.2.
+      **Known breakage:** with the gate in, a world holding only the golden guard pack is refused at start, so C.1's
+      `guard-pack.txt` and `guard-disable/reenable.txt` smokes can't pass any more. Redo them in C.3 with `/commit confirm`
+      in boot 1 instead of the golden pack.
+      **Done, session 6 (2026-10-22):** client gate in src: `client/ClientGate` (the reviewed draft, unchanged),
+      `mixin/WorldOpenFlowsMixin` (HEAD inject on `openWorld(String, Runnable)`, cancels and hands to `ClientGate.check`
+      unless `consumePass`), a `client` list in `commitment.mixins.json`. Fact (26.3 jar, every class naming `openWorld`):
+      the world list's Play, `QuickPlay` and the title screen's demo world all go through `openWorld`; nothing else opens
+      a saved world, so the HEAD inject covers every way in. `WorldGateClientGameTest` (named `*ClientGameTest` so
+      NeoForge/Forge don't copy it, gotchas.md): create a world, write its record as `/commit confirm` will, reopen
+      through `TestWorldSave.open()` (vanilla `openWorld`) → opens; add `config/commitment-client-gate-test.json`,
+      `openWorld` → `AlertScreen`, no level and no integrated server, Back → title; deletes its config file and mirror.
+      **Runs:** `./gradlew build` exit 0: common **242** JUnit per node, fabric 12, GameTests "4 of ours and 1 others
+      ran, 0 failed" on all nine, 0 warnings. `:fabric:<n>:runClientGameTest` exit 0 on **26.1.2, 26.2, 26.3**: `client
+      world check: PASS`, the guard pack written by the `Commitment world gate` thread (the pass path ran the gate),
+      `Commitment: locked screen (1 changes)`, `client gate check: PASS`; mirror dirs empty after. **Mutation:** the
+      mixin's pass check forced true (gate off) → 26.3 red ("Timed out waiting for predicate"; the locked world loaded
+      behind); restored, `cmp`-verified, 26.3 green again. **Rung 3:** `guard-pack-smoke.sh locked-boot.txt
+      locked-unlock.txt locked-cancel.txt` **exit 0 on neoforge and forge 26.1.2/26.2/26.3 and fabric 26.1.2/26.2**
+      (fabric 26.3 in session 5): 24 boots, 24 `dev-server-smoke: PASS`, each refused, `unlock available at … (24h)`
+      then `unlock cancelled`, cleanup removed zip + record + mirror. Boot-line order from each `latest.log`: the
+      entrypoint's `loaded on` line comes before the gate on every NeoForge (39–40 vs 45–47) and Forge (14–16 vs 23)
+      node, so `Platform` is installed in time on all three loaders.
+      **Review notes:** internet time is bounded (connect + read timeouts and a hard deadline), so the "checking" screen
+      can't hang. The interim refusal ends with the timer text "/unlock starts…", which a refused world can't run: C.4.
+- [ ] C.2a **Fabric 1.21.11 node** (owner, session 6: "add support for fabric 1.21.11 only, then we can run live
+      tests"). Done right after C.2 is committed, before C.3, so C.3–C.6 are written and tested against it from the
+      start. Tier 2 (a new Minecraft version). Fabric only: no NeoForge, Forge or Quilt for 1.21.11.
+      **Facts first (mc-port):** 1.21.11 is obfuscated, 26.x isn't, so the node needs Loom's remapping plugin and
+      Mojang mappings while 26.x keeps `net.fabricmc.fabric-loom`. Read from official metadata, dated: the Loom plugin
+      id and version for an obfuscated target in a Stonecutter build shared with unobfuscated nodes, Fabric API for
+      1.21.11, the data pack format (`version.json`; the guard pack's `min_format` 101 is above 1.21.11's, so the pack
+      may need a per-version `pack.mcmeta`, per 0.2's fallback), and by `javap` on 1.21.11 every vanilla member C.0–C.2
+      use (`Main.main`'s `validateAndCreateAccess`, `WorldOpenFlows.openWorld`, `setScreenAndShow`, `CommandStorage`,
+      the seed's saved-data file, the GameTest API). Look in ../mcMMO-Singleplayer for a 1.21.x Fabric node to copy.
+      **Then:** a `1.21.11` node in `common` and `fabric` only, `//? if` blocks where the facts differ, the
+      band-label/range test extended, README's band statement (26.x plus Fabric 1.21.11) with its test, decisions.md
+      (an exception to "one current band", by the owner). **Proof:** build + JUnit + GameTests on the node, C.1 and C.2
+      smokes on it, client world check.
+      **Facts, fetched 2026-10-22:** piston-meta: 1.21.11 released 2025-12-09, `javaVersion.majorVersion` **21**. The
+      owner's Prism instance runs Java 21.0.7 (instance.cfg, read-only), so the node compiles with `release 21` (a
+      Java 25 class file won't load there); the sources' only Java 22+ syntax is six `case X _` patterns (`getFirst`/
+      `reversed` are 21). Fabric API newest for 1.21.11: **0.141.6+1.21.11** (maven-metadata, lastUpdated 2026-10-20).
+      Fabric Loader 0.19.5 (our pin, the instance's too) runs it. `net.fabricmc.fabric-loom-remap` 1.18.4 exists (same
+      Loom version as ours). ../enchanting-2 builds 1.21.11 beside 26.x in one Stonecutter build with
+      `dev.kikugie.loom-back-compat` 0.4.3 (applies fabric-loom-remap or fabric-loom per node; `loomx.loom_version`,
+      `loomx.applyMojangMappings()`), a JDK 21 toolchain per node (`java_version`), foojay resolver; its gotchas: 1.21.11
+      Mojang names already say `Identifier`; 26.2 moved `setScreen` (we use `setScreenAndShow`).
+      javap on 1.21.11 (Mojang-mapped, Loom cache): `GenericMessageScreen(Component)`, `AlertScreen(Runnable, Component,
+      Component)`, `WorldOpenFlows.minecraft` / `openWorld(String, Runnable)`, `Minecraft.gameDirectory` /
+      `getLevelSource` / `createWorldOpenFlows` / `setScreenAndShow`, `LevelStorageSource.getBaseDir` /
+      `validateAndCreateAccess` (called once in `Main.main`), `LevelStorageAccess.getLevelPath` / `safeClose`,
+      `CommandStorage.get/set(Identifier, CompoundTag)`, `SharedConstants.getCurrentVersion().name()`: **all identical**.
+      **Open, read before coding:** (1) where 1.21.11 keeps the seed (expected `level.dat` `Data.WorldGenSettings.seed`;
+      `WorldSeed` only reads 26.x's `world_gen_settings.dat`) and the game rules; (2) the guard pack on data format 94.x:
+      does `configurePackRepository` still auto-enable a world pack whose `min_format` is above the game's, and do
+      `check`/`load` parse there. If not, `GuardPack` writes a per-version `pack.mcmeta` (0.2's fallback); (3) the
+      GameTest API on 1.21.11 (`GuardGameTest`'s mock player helper, `TestData`).
+- [ ] C.2b **Save safety** (owner, session 6: "we have to be 100% sure we don't accidentally ruin people's saves").
+      - A JUnit source scan: only `LockStore`, `GuardPack`'s writer and `LockLifter` may call `Files.write|move|delete|
+        copy|newOutputStream` or `FileOutputStream`; any other class doing so fails the test (mutation: a stray write
+        added elsewhere → red).
+      - A world-dir audit in the smokes: list `<world>` before and after each Commitment run, and fail on any path
+        created, removed or renamed that isn't vanilla's own or one of Commitment's three files.
+      - The Stage E packs (below) restarted with no changes → zero diffs on every node, so no player gets a false lock.
 - [ ] C.3 Commands per the spec, registered through the platform seam. Server GameTests: every
       transition, each message, the 60 s confirm expiry, a non-host refused.
       **Design:** the Brigadier tree in common (`command/CommitmentCommands`), registered by Fabric's
@@ -563,6 +646,8 @@ NeoForge and Forge first** (step C.0), so Proof 2 runs on all nine loader × nod
       already is). `/unlock confirm` reads internet time off the server thread and applies the result on it.
 - [ ] C.4 The LockedScreen per node: diff, Back, start-unlock with confirm, countdown, cancel.
       It logs `Commitment: locked screen (<n> changes)`. Fabric client GameTest from Proof 6.
+      Replaces C.2's interim `AlertScreen`, whose last line ("/unlock starts the 24-hour unlock") is a command the
+      player can't reach from a refused world: the screen says "Start 24-hour unlock" and has the button.
       NeoForge and Forge have no client GameTest, so `:<node>:runClient` on a disposable world,
       with that line read from the log and recorded here.
 - [ ] C.5 Dev-server smokes `commit-flow.txt` and `locked-boot.txt` on each loader, and Proof 4
@@ -589,9 +674,10 @@ NeoForge and Forge first** (step C.0), so Proof 2 runs on all nine loader × nod
       the never-locked list.
       **Owner, session 5:** use the Prism instance `1.21.11` (`%APPDATA%\PrismLauncher\instances\1.21.11`, read-only
       look: Minecraft 1.21.11, Fabric Loader 0.19.5, 82 mods, 305 config files). **Open:** Commitment ships 26.x only,
-      so it can't load in that instance. Prism's `26.3` instance has only Fabric API and one other mod. Ask the owner
-      before Stage E: a scanner-only run on a copy (launch the copy 3×, scan with common's `ManifestScanner` between
-      launches), or a 26.x pack built from the same mods.
+      so it can't load in that instance. Prism's `26.3` instance has only Fabric API and one other mod.
+      **Owner, session 6:** add a Fabric 1.21.11 node (C.2a) and run Commitment live on a **copy** of that instance.
+      For each 26.x node, build a simple test pack or use a premade vanilla+ pack (Modrinth), on every loader that has
+      one, and run the same 3-restart check there. Packs are downloaded into `run/packs/<node>/`, never into Prism.
 - [ ] E.2 Time the scan on that pack. If it adds more than 2 s to world open, optimize, and
       measure before and after.
 

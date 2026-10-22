@@ -15,6 +15,8 @@
 #   @expect <regex>    the server output must contain a line matching this (grep -E)
 #   @reject <regex>    the server output must contain no line matching this (grep -E)
 #   @allow-error <re>  an ERROR line from the mod matching this is expected, not a failure
+#   @exits-nonzero     the server is expected to stop by itself with a non-zero exit (a refusal); a timeout still fails
+#   @gradle <arg>      passed to Gradle, e.g. @gradle -Pcommitment.unlock=start (each loader's run forwards it)
 #   # comment, blank   ignored
 #
 # One qualified run task per run: a bare `runServer` under Stonecutter starts every node, all on one port.
@@ -37,7 +39,7 @@ launched() {
 
 # verdict <server output> [commands file]: prints each failure, returns 0 (proven) or 1 (the mod is bad).
 verdict() {
-	local out=$1 commands=${2:-} fail=0 line re errors
+	local out=$1 commands=${2:-} fail=0 line re errors refusal=no
 	local -a allowed=() expected=() rejected=()
 	if [[ -n "$commands" ]]; then
 		while IFS= read -r line || [[ -n "$line" ]]; do
@@ -46,10 +48,14 @@ verdict() {
 				@allow-error\ *) allowed+=("${line#@allow-error }") ;;
 				@expect\ *) expected+=("${line#@expect }") ;;
 				@reject\ *) rejected+=("${line#@reject }") ;;
+				@exits-nonzero) refusal=yes ;;
 			esac
 		done < "$commands"
 	fi
-	grep -q 'Done (' "$out" || { echo "FAIL: the server never finished starting (no 'Done (')"; fail=1; }
+	# A refusal stops before the world loads, so there's no "Done (" to wait for.
+	if [[ $refusal == no ]]; then
+		grep -q 'Done (' "$out" || { echo "FAIL: the server never finished starting (no 'Done (')"; fail=1; }
+	fi
 	grep -qE -- "$BOOT_LINE" "$out" || { echo "FAIL: no boot line matching: $BOOT_LINE"; fail=1; }
 	errors=$(grep -E -- "$ERROR_LINE" "$out" | grep -i 'commitment' || true)
 	for re in ${allowed[@]+"${allowed[@]}"}; do
@@ -79,6 +85,27 @@ verdict() {
 	return $fail
 }
 
+# exit_verdict <runServer's exit status> <yes|no: @exits-nonzero>: prints a failure, returns 0 or 1.
+exit_verdict() {
+	local status=$1 refusal=$2
+	if [[ $refusal == yes ]]; then
+		if (( status == 0 )); then
+			echo "FAIL: the server was expected to refuse and exit non-zero, but runServer exited 0"
+			return 1
+		fi
+		if (( status == 124 )); then
+			echo "FAIL: the server was expected to refuse by itself, but the run timed out (124)"
+			return 1
+		fi
+		echo "runServer exited $status, as @exits-nonzero expects"
+		return 0
+	fi
+	if (( status != 0 )); then
+		echo "FAIL: runServer exited with $status (124 = timed out; check for a leftover server JVM by command line, never by name)"
+		return 1
+	fi
+}
+
 # Feeds the verdict synthetic logs of both polarities. A verdict nothing ever fed an ERROR line can't be trusted.
 self_test() {
 	local dir failures=0
@@ -97,6 +124,11 @@ self_test() {
 	printf '%s\n' '@reject Commitment guard: Commitment is missing' > "$dir/reject.txt"
 	printf '%s\n' "$boot" "$done_line" '[16:00:08] [Server thread/INFO] (Minecraft) [Server] Commitment guard: Commitment is missing' \
 		> "$dir/rejected.log"
+
+	printf '%s\n' "$boot" '[16:00:02] [main/ERROR] (commitment) Commitment: setup changed since /commit, refusing to load world' \
+		> "$dir/refused.log"
+	printf '%s\n' '@exits-nonzero' '@allow-error refusing to load' > "$dir/refusal.txt"
+	printf '%s\n' '@allow-error refusing to load' > "$dir/refusal-allowed-only.txt"
 
 	check() { # check <expected status> <name> <log> [commands]
 		local want=$1 name=$2 got=0
@@ -120,6 +152,8 @@ self_test() {
 	check 0 "@allow-error lets a named ERROR through" "$dir/error.log" "$dir/allow.txt"
 	check 1 "a line matching @reject fails" "$dir/rejected.log" "$dir/reject.txt"
 	check 0 "no line matching @reject passes" "$dir/good.log" "$dir/reject.txt"
+	check 0 "@exits-nonzero: a refusal with no Done passes" "$dir/refused.log" "$dir/refusal.txt"
+	check 1 "without @exits-nonzero, no Done fails" "$dir/refused.log" "$dir/refusal-allowed-only.txt"
 
 	# A crash during mod loading launched the game: that's a verdict (1), not "nothing proven" (2).
 	printf '%s\n' '> Task :forge:26.3:runServer' \
@@ -140,6 +174,22 @@ self_test() {
 		echo "ok   a compile failure counts as not launched"
 	fi
 	check 1 "a mod-loading crash fails the verdict" "$dir/forge-crash.out"
+
+	exit_check() { # exit_check <expected> <name> <status> <yes|no>
+		local got=0
+		exit_verdict "$3" "$4" > /dev/null || got=$?
+		if [[ $got == "$1" ]]; then
+			echo "ok   $2"
+		else
+			echo "FAIL $2: exit_verdict returned $got, expected $1"
+			failures=$((failures + 1))
+		fi
+	}
+	exit_check 0 "exit 0 passes" 0 no
+	exit_check 1 "a non-zero exit fails" 1 no
+	exit_check 0 "@exits-nonzero: a refusal's exit 1 passes" 1 yes
+	exit_check 1 "@exits-nonzero: exit 0 fails" 0 yes
+	exit_check 1 "@exits-nonzero: a timeout fails" 124 yes
 	rm -rf "$dir"
 	if (( failures > 0 )); then
 		echo "self-test: $failures failed"
@@ -185,6 +235,18 @@ if netstat -an 2>/dev/null | grep -qE "[:.]${PORT}[[:space:]].*LISTEN"; then
 	exit 2
 fi
 
+REFUSAL=no
+GRADLE_ARGS=()
+if [[ -n "$COMMANDS_FILE" ]]; then
+	while IFS= read -r line || [[ -n "$line" ]]; do
+		line=${line%$'\r'}
+		case "$line" in
+			@exits-nonzero) REFUSAL=yes ;;
+			@gradle\ *) GRADLE_ARGS+=("${line#@gradle }") ;;
+		esac
+	done < "$COMMANDS_FILE"
+fi
+
 mkdir -p build
 touch "$MARKER"
 
@@ -209,7 +271,8 @@ feed_console() {
 	if [[ -n "$COMMANDS_FILE" ]]; then
 		while IFS= read -r cmd || [[ -n "$cmd" ]]; do
 			cmd=${cmd%$'\r'}
-			[[ -z "$cmd" || "$cmd" == \#* || "$cmd" == @expect\ * || "$cmd" == @reject\ * || "$cmd" == @allow-error\ * ]] && continue
+			[[ -z "$cmd" || "$cmd" == \#* || "$cmd" == @expect\ * || "$cmd" == @reject\ * || "$cmd" == @allow-error\ * ||
+				"$cmd" == @exits-nonzero || "$cmd" == @gradle\ * ]] && continue
 			if [[ "$cmd" == @sh\ * ]]; then
 				echo "dev-server-smoke: \$ ${cmd#@sh }" >&2
 				bash -c "${cmd#@sh }" >&2 || echo "dev-server-smoke: @sh step failed: ${cmd#@sh }" >&2
@@ -225,7 +288,8 @@ feed_console() {
 
 echo "dev-server-smoke: :$LOADER:$NODE:runServer on port $PORT, output in $OUT"
 set +e
-feed_console | timeout $((BOOT_TIMEOUT + 180)) ./gradlew ":$LOADER:$NODE:runServer" --console=plain > "$OUT" 2>&1
+feed_console | timeout $((BOOT_TIMEOUT + 180)) ./gradlew ":$LOADER:$NODE:runServer" --console=plain ${GRADLE_ARGS[@]+"${GRADLE_ARGS[@]}"} \
+	> "$OUT" 2>&1
 status=$?
 set -e
 
@@ -234,9 +298,8 @@ if ! launched "$OUT"; then
 	tail -40 "$OUT" >&2
 	exit 2
 fi
-if (( status != 0 )); then
-	echo "dev-server-smoke: FAIL: runServer exited with $status (124 = timed out; check for a leftover server JVM by" \
-		"command line, never by name). Tail of $OUT:" >&2
+if ! exit_verdict "$status" "$REFUSAL" >&2; then
+	echo "dev-server-smoke: FAIL. Tail of $OUT:" >&2
 	tail -40 "$OUT" >&2
 	exit 1
 fi

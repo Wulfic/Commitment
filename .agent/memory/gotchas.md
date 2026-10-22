@@ -186,3 +186,11 @@ block where the plain set is needed. The plan line was written from memory: read
 **Dead ends:** A `javap` per class over the whole client jar to find the new owner (minutes). Disassembling a vanilla
 caller (`WorldOpenFlows`) answered it in one command.
 **Affects:** C.2 client gate (ClientGate, WorldOpenFlowsMixin)
+
+## 2026-10-22 — A Fabric client GameTest's file name must end in `ClientGameTest.java`
+**Symptom:** none yet: caught while writing `ClientGateGameTest.java`.
+**Cause:** NeoForge and Forge compile Fabric's server GameTest dir per node (C.0), and both the `serverGameTestJava`
+filter and `GameTestSourcesTest` skip client tests by the `*ClientGameTest.java` suffix, not by entrypoint. A client
+test named otherwise is copied to NeoForge/Forge, where `net.fabricmc...client.gametest` doesn't exist.
+**Fix:** named it `WorldGateClientGameTest`.
+**Affects:** fabric/src/gametest/java, fabric/build.gradle, GameTestSourcesTest

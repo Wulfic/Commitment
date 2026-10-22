@@ -1,0 +1,8 @@
+# C.2, boot 2 of 3 (after locked-boot.txt, through the wrapper): -Dcommitment.unlock=start starts the 24-hour timer
+# with internet time, saves it, and the server still refuses the world. Needs internet.
+@gradle -Pcommitment.unlock=start
+@exits-nonzero
+@allow-error Commitment: setup changed since /commit, refusing to load world
+@expect Commitment: setup changed since /commit, refusing to load world
+@expect Commitment: unlock available at .* \(24h\)
+@reject Done \(
