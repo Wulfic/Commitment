@@ -17,7 +17,11 @@
 #   @allow-error <re>  an ERROR line from the mod matching this is expected, not a failure
 #   @exits-nonzero     the server is expected to stop by itself with a non-zero exit (a refusal); a timeout still fails
 #   @gradle <arg>      passed to Gradle, e.g. @gradle -Pcommitment.unlock=start (each loader's run forwards it)
+#   @audit-allow <re>  a world path the check's own @sh steps change on purpose (see the world audit below)
 #   # comment, blank   ignored
+#
+# Every run audits the world folder (scripts/world-audit.sh, TODO.md C.2b): a snapshot before the launch and after
+# the stop, and a path Commitment created, removed or changed outside its own files and vanilla's fails the run.
 #
 # One qualified run task per run: a bare `runServer` under Stonecutter starts every node, all on one port.
 # Never kills java by name: the owner's game and other repos' servers run on this machine.
@@ -191,6 +195,7 @@ self_test() {
 	exit_check 1 "@exits-nonzero: exit 0 fails" 0 yes
 	exit_check 1 "@exits-nonzero: a timeout fails" 124 yes
 	rm -rf "$dir"
+	bash scripts/world-audit.sh --self-test || failures=$((failures + 1))
 	if (( failures > 0 )); then
 		echo "self-test: $failures failed"
 		return 1
@@ -237,17 +242,26 @@ fi
 
 REFUSAL=no
 GRADLE_ARGS=()
+AUDIT_ALLOW=()
 if [[ -n "$COMMANDS_FILE" ]]; then
 	while IFS= read -r line || [[ -n "$line" ]]; do
 		line=${line%$'\r'}
 		case "$line" in
 			@exits-nonzero) REFUSAL=yes ;;
 			@gradle\ *) GRADLE_ARGS+=("${line#@gradle }") ;;
+			@audit-allow\ *) AUDIT_ALLOW+=("${line#@audit-allow }") ;;
 		esac
 	done < "$COMMANDS_FILE"
 fi
 
+# The world the server opens: server.properties' level-name, vanilla's "world" until the first boot writes the file.
+LEVEL_NAME=$(sed -n 's/^level-name=//p' "$RUN_DIR/server.properties" 2>/dev/null | tr -d '\r')
+WORLD=$RUN_DIR/${LEVEL_NAME:-world}
+AUDIT_BEFORE=build/world-audit-$LOADER-$NODE.before
+AUDIT_AFTER=build/world-audit-$LOADER-$NODE.after
+
 mkdir -p build
+bash scripts/world-audit.sh snapshot "$WORLD" "$AUDIT_BEFORE"
 touch "$MARKER"
 
 # Writes the server's stdin, and holds it open until "stop": waits for this run's "Done (" line (the log has to be
@@ -272,7 +286,7 @@ feed_console() {
 		while IFS= read -r cmd || [[ -n "$cmd" ]]; do
 			cmd=${cmd%$'\r'}
 			[[ -z "$cmd" || "$cmd" == \#* || "$cmd" == @expect\ * || "$cmd" == @reject\ * || "$cmd" == @allow-error\ * ||
-				"$cmd" == @exits-nonzero || "$cmd" == @gradle\ * ]] && continue
+				"$cmd" == @exits-nonzero || "$cmd" == @gradle\ * || "$cmd" == @audit-allow\ * ]] && continue
 			if [[ "$cmd" == @sh\ * ]]; then
 				echo "dev-server-smoke: \$ ${cmd#@sh }" >&2
 				bash -c "${cmd#@sh }" >&2 || echo "dev-server-smoke: @sh step failed: ${cmd#@sh }" >&2
@@ -303,7 +317,11 @@ if ! exit_verdict "$status" "$REFUSAL" >&2; then
 	tail -40 "$OUT" >&2
 	exit 1
 fi
-if verdict "$OUT" "$COMMANDS_FILE"; then
+verdict_status=0
+verdict "$OUT" "$COMMANDS_FILE" || verdict_status=1
+bash scripts/world-audit.sh snapshot "$WORLD" "$AUDIT_AFTER"
+bash scripts/world-audit.sh compare "$AUDIT_BEFORE" "$AUDIT_AFTER" ${AUDIT_ALLOW[@]+"${AUDIT_ALLOW[@]}"} || verdict_status=1
+if (( verdict_status == 0 )); then
 	echo "dev-server-smoke: PASS ($LOADER $NODE)"
 	exit 0
 fi

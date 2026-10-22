@@ -208,3 +208,12 @@ add repositories to 'buildscript.repositories'".
 **Fix:** the KikuGie repo as a plain `maven { content { includeGroupAndSubgroups 'dev.kikugie' } }`, plus a settings
 `gradle.lifecycle.beforeProject { buildscript.repositories { Fabric, mavenCentral, gradlePluginPortal } }`.
 **Affects:** settings.gradle
+
+## 2026-10-22 — A mutation that didn't apply looks like a green mutation check
+**Symptom:** mutating `scripts/world-audit.sh`'s `(\.$UUID\.lifted)?` with a Python replace passed from Git Bash
+reported "0 cases red". The replace had asserted and failed, so the self-test ran on the unmutated copy.
+**Cause:** the backslashes didn't survive the trip to Windows Python, both as a command-line argument and inside the
+agent's quoted heredoc (`r'(\.…'` arrived as `r'(\.…'`).
+**Fix:** build backslashes in Python with `chr(92)`, and have every mutation script `assert s.count(old) == 1` and
+print "mutated" before the run, so a mutation that didn't apply can't read as a pass.
+**Affects:** mutation checks of any script or source holding backslashes

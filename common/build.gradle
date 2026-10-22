@@ -70,6 +70,11 @@ test {
 	// alone reruns it.
 	systemProperty "commitment.repoRoot", rootDir.absolutePath
 	inputs.file(rootProject.file("README.md"))
+	// FileWritersTest scans every loader's shipped sources, so a write added to any of them reruns it.
+	["common", "fabric", "neoforge", "forge"].each { loader ->
+		inputs.dir(rootProject.file("$loader/src/main/java")).withPropertyName("${loader}MainSources")
+			.withPathSensitivity(PathSensitivity.RELATIVE)
+	}
 	testLogging {
 		events = ["passed", "skipped", "failed"]
 		exceptionFormat = "full"

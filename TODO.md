@@ -701,6 +701,52 @@ NeoForge and Forge first** (step C.0), so Proof 2 runs on all nine loader × nod
       - A world-dir audit in the smokes: list `<world>` before and after each Commitment run, and fail on any path
         created, removed or renamed that isn't vanilla's own or one of Commitment's three files.
       - The Stage E packs (below) restarted with no changes → zero diffs on every node, so no player gets a false lock.
+      **Plan (session 7, before code).** Facts: today the only direct filesystem writes in shipped code (`*/src/main/java`,
+      every loader) are `LockStore.writeAtomically` (createDirectories, write, move ×2, deleteIfExists of its own temp) and
+      `LockLifter.lift`'s `Files.move`; `writeAtomically` is called by `LockStore` ×2 (world record, mirror) and
+      `GuardPack.write` ×1. Vanilla also saves files because of us: our command storage
+      (`data/commitment/command_storage.dat` on 26.x, `data/command_storage_commitment.dat` on 1.21.11) and the selected
+      pack list in `level.dat`.
+      1. `common/src/test/.../FileWritersTest`: walks `common|fabric|neoforge|forge/src/main/java` (declared as test
+         inputs), finds every filesystem-writing call (`Files.write*|move|copy|delete*|create*|newOutputStream|
+         newBufferedWriter|newByteChannel|setAttribute|setLastModifiedTime`, `FileOutputStream`, `FileWriter`,
+         `RandomAccessFile`, `FileChannel.open`, `File.delete|renameTo|mkdir`, `FileSystems.newFileSystem`), and requires
+         the list of (file, call) to be **exactly** the pinned one above, plus the pinned callers of `writeAtomically`. A
+         new write anywhere, even inside `LockStore`, fails until the pin is changed on purpose. Guards against a vacuous
+         scan: every root exists and `LockStore.java` was read. Mutations: a `Files.writeString` added to `WorldGate` →
+         red; one more `Files.move` in `LockStore` → red; a `writeAtomically` call from `ServerGate` → red.
+      2. `scripts/world-audit.sh` (`snapshot <world> <out>`, `compare <before> <after> [allow-regex...]`, `--self-test`):
+         a snapshot lists every path, with a SHA-256 for files outside vanilla's own locations. `compare` fails on: a
+         path with "commitment" in its name that isn't one of ours (record, guard pack, their `.<lockId>.lifted` names,
+         vanilla's save of our command storage); a pre-existing path removed, unless it's ours; a new path outside
+         vanilla's and the loaders' locations (`level.dat*`, `session.lock`, `icon.png`, `data/`, `DIM-1/`, `DIM1/`,
+         `dimensions/`, `region/`, `entities/`, `poi/`, `players/`, `playerdata/`, `stats/`, `advancements/`,
+         `syncedconfig/`, `serverconfig/`, the `datapacks` dir itself); a changed file outside those locations that isn't
+         ours (another datapack, anything a player put there). `dev-server-smoke.sh` snapshots `run/<l>/<n>/server/<level-name>`
+         before and after every run and fails (exit 1) on a finding; `@audit-allow <regex>` in a commands file names
+         paths the check's own `@sh` steps change. `--self-test` runs the audit's cases too, both polarities.
+      3. Rung 3 with the audit on: `boot.txt` and the three locked boots on fabric 1.21.11, fabric 26.3, neoforge 26.2,
+         forge 26.1.2 (all ten pairs again in C.3/C.5, which re-run every smoke). Mutation: a stray file written into
+         the world by an `@sh` step without `@audit-allow` → exit 1.
+      **Not doing here:** the Stage E zero-diff runs (bullet 3; they need E.1's packs, and stay a C.2b item checked
+      there); auditing the client GameTest's worlds (they're created and deleted by the test); the mirror dir (outside
+      the world; `guard-pack-smoke.sh` already fails on leftovers there).
+      **Blast radius:** none, additive: a test, a read-only script (it only reads the world and writes its snapshots to
+      `build/`). **Rollback:** `git revert` of the C.2b commit.
+      **Done, session 7 (bullets 1 and 2; bullet 3 waits for E.1):** `FileWritersTest` green on `:common:26.3` first run;
+      **mutations, each red and restored (`cmp`):** a `Files.writeString` in `WorldGate`; a second `Files.move` in
+      `LockStore`; a `writeAtomically` call from `LockCodec` (from `ServerGate` it doesn't compile: package-private, so the
+      compiler is a first guard); a `Files.delete` in `CommitmentFabric` (a loader root is scanned, and its edit reruns
+      the test). `scripts/world-audit.sh --self-test`: 20 cases, both polarities, run by `dev-server-smoke.sh --self-test`
+      too; **mutations on a scratch copy**: removal check off → 4 red, hash compare off → 2, everything vanilla → 5, the
+      Commitment-name check off → 2, lifted names with any id → 1, allow-regex ignored → 1. **Rung 3 with the audit:**
+      `boot.txt` exit 0 and `guard-pack-smoke.sh locked-boot locked-unlock locked-cancel` exit 0 on fabric 1.21.11, fabric
+      26.3, neoforge 26.2, forge 26.1.2 (16 boots, every audit "clean"; a locked boot adds exactly `data/commitment.dat`,
+      the tampered record). **Revert check:** an `@sh` step writing `c2b-stray-audit-test.txt` into the fabric 26.3 world
+      with no `@audit-allow` → exit 1, `world-audit: a new path outside vanilla's locations: c2b-stray-audit-test.txt`
+      (the file removed afterwards).
+      `./gradlew build` exit 0 on all 13 nodes: common **246** per node (`FileWritersTest` on each), fabric 12, GameTests 4
+      of ours on all ten, 0 failed, no javac warnings.
 - [ ] C.3 Commands per the spec, registered through the platform seam. Server GameTests: every
       transition, each message, the 60 s confirm expiry, a non-host refused.
       **Design:** the Brigadier tree in common (`command/CommitmentCommands`), registered by Fabric's
@@ -708,6 +754,46 @@ NeoForge and Forge first** (step C.0), so Proof 2 runs on all nine loader × nod
       server's own player, or permission level 4. Pending confirms per sender, 60 s. `/commit confirm` writes the record,
       the mirror and the guard pack, then selects the pack and reloads, so the guard is live at once (the heartbeat
       already is). `/unlock confirm` reads internet time off the server thread and applies the result on it.
+      **Facts (javap, session 7, 1.21.11/26.1.2/26.2/26.3 Mojang-named jars):** `CommandSourceStack.permissions()`,
+      `getPlayer()`, `isPlayer()`, `getServer()`, `sendSuccess(Supplier<Component>, boolean)`, `sendFailure(Component)`, and
+      `MinecraftServer.isSingleplayerOwner(NameAndId)`, `isDedicatedServer()`, `getServerDirectory()` are the same on all
+      four (26.3 changed only `CommandSourceStack`'s constructors: don't construct one). Owner check:
+      `permissions().hasPermission(Permissions.COMMANDS_OWNER)` (1.21.11 and 26.3; the compiler confirms the others). A
+      command block or a datapack function runs at GAMEMASTER, so it's refused. **`getServerDirectory()` is
+      `Path.of("")`, the JVM's working dir, not `--gameDir`**, and the client gate scans `minecraft.gameDirectory`: a
+      launcher whose working dir differs would see a different `config/` at commit and at open, a false lock. So on the
+      integrated server `/commit` takes the game dir from one client helper that the gate uses too.
+      **Plan (session 7, before code), split in three commits:**
+      - **C.3a common.** `command/CommitmentCommands` (Brigadier tree `commit [confirm|status]`, `unlock [confirm|cancel]`;
+        `requires`: `COMMANDS_OWNER` or the singleplayer owner, so cheats needn't be on; per-sender pending confirms with
+        an injected monotonic clock, 60 s; one commit/unlock in flight per server). The scan and internet time run on a
+        Commitment daemon thread, the result is applied with `server.execute`, and nothing is applied to a stopped
+        server. `CommitmentServer.environment(server)`: dedicated → `Path.of("").toAbsolutePath()` as `ServerGate`;
+        integrated → `client/ClientGameDir.get()` (referenced only on that branch, so a dedicated server never loads a
+        client class), also used by `ClientGate`. `/commit confirm` → `LockStore.create` (world settings empty until
+        C.6), `GuardPack.write`, `beat`, `select`; logs and sends `Commitment: world committed (<counts>)`.
+        `Manifest.counts()` → mods, resource packs, config files, datapacks, for `/commit`'s preview. Messages as the
+        behaviour spec; `/unlock confirm` through `UnlockTimer.start` + `LockStore.save`, `/unlock cancel` through
+        `UnlockTimer.cancel`. A test seam for the clocks (internet time and the confirm clock), honoured in development
+        runs only, as `MirrorDir.OVERRIDE`. JUnit: counts, the pending-confirm state machine (expiry at 60 s, per sender,
+        a confirm with nothing pending), the messages.
+      - **C.3b loaders + server GameTests.** Fabric `CommandRegistrationCallback` (command-api-v2), NeoForge and Forge
+        `RegisterCommandsEvent`. `CommandsGameTest` (one sequential test, since every test shares the server's world):
+        each transition and message through `server.getCommands()` with a capturing source; the three files and the
+        heartbeat after `/commit confirm`; `/unlock confirm` with the fake clock → timer saved; cancel; a confirm after
+        61 s (fake clock) → expired; a mock non-op player → refused. Cleans up its files.
+      - **C.3c client + live.** Client GameTest on every Fabric node: create a world, `/commit` + `/commit confirm` as the
+        host from chat, quit, reopen through `openWorld` → **opens** (the commit-time scan equals the gate's: proves the
+        game-dir rule above); add a config file → locked. Dev-server: `scripts/commit-smoke.sh` (refuses on leftovers,
+        boots once per commands file over one world, then removes Commitment's three files by marker and lock id) with
+        `scripts/checks/commit-flow.txt` (`@expect Commitment: world committed`, `@expect unlock available at`, `@expect
+        unlock cancelled`), then C.1's redo: `guard-live.txt` (boot 2: pack enabled, `{alive: 1b}`, `@reject` the guard
+        line), `guard-disable.txt` + `guard-reenable.txt` on the committed world. All ten loader × node pairs.
+      **Not doing in C.3:** world settings (C.6), the LockedScreen (C.4), `locked-boot` from a config change (C.5).
+      **Blast radius:** `/commit confirm` writes Commitment's three files in dev worlds and `run/<l>/<n>/mirror` only;
+      the smoke wrapper removes only files carrying the marker and the run's lock id, after its own refusal on leftovers.
+      **Rollback:** `git revert` of the C.3 commits; a dev world committed by a failed run: the wrapper's cleanup, or the
+      plan's rollback paths below.
 - [ ] C.4 The LockedScreen per node: diff, Back, start-unlock with confirm, countdown, cancel.
       It logs `Commitment: locked screen (<n> changes)`. Fabric client GameTest from Proof 6.
       Replaces C.2's interim `AlertScreen`, whose last line ("/unlock starts the 24-hour unlock") is a command the
