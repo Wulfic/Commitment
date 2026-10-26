@@ -18,6 +18,9 @@
 #   @exits-nonzero     the server is expected to stop by itself with a non-zero exit (a refusal); a timeout still fails
 #   @gradle <arg>      passed to Gradle, e.g. @gradle -Pcommitment.unlock=start (each loader's run forwards it)
 #   @audit-allow <re>  a world path the check's own @sh steps change on purpose (see the world audit below)
+#   @before <shell>    run with bash from the repo root before the server launches (a failure: exit 2, nothing proven)
+#   @after <shell>     run with bash from the repo root once the server has stopped, whatever the verdict (cleanup)
+#                      @sh, @before and @after see LOADER and NODE in their environment
 #   @wait <regex>      hold the next command until this run's log has a line matching this (up to WAIT_TIMEOUT s,
 #                      default 90), for a reply that comes later than the command; counts as an @expect too.
 #                      Pick a pattern that only that step's reply prints: an earlier line of this boot matches as well
@@ -205,6 +208,7 @@ self_test() {
 	bash scripts/world-audit.sh --self-test || failures=$((failures + 1))
 	bash scripts/commit-smoke.sh --self-test || failures=$((failures + 1))
 	bash scripts/client-locked-smoke.sh --self-test || failures=$((failures + 1))
+	bash scripts/vanilla-guard-smoke.sh --self-test || failures=$((failures + 1))
 	if (( failures > 0 )); then
 		echo "self-test: $failures failed"
 		return 1
@@ -217,8 +221,8 @@ if [[ "${1:-}" == "--self-test" ]]; then
 	exit $?
 fi
 
-LOADER=${LOADER:-fabric}
-NODE=${NODE:-26.3}
+export LOADER=${LOADER:-fabric}
+export NODE=${NODE:-26.3}
 BOOT_TIMEOUT=${BOOT_TIMEOUT:-420}
 WAIT_TIMEOUT=${WAIT_TIMEOUT:-90}
 COMMANDS_FILE=${1:-}
@@ -253,6 +257,8 @@ fi
 REFUSAL=no
 GRADLE_ARGS=()
 AUDIT_ALLOW=()
+BEFORE=()
+AFTER=()
 if [[ -n "$COMMANDS_FILE" ]]; then
 	while IFS= read -r line || [[ -n "$line" ]]; do
 		line=${line%$'\r'}
@@ -260,6 +266,8 @@ if [[ -n "$COMMANDS_FILE" ]]; then
 			@exits-nonzero) REFUSAL=yes ;;
 			@gradle\ *) GRADLE_ARGS+=("${line#@gradle }") ;;
 			@audit-allow\ *) AUDIT_ALLOW+=("${line#@audit-allow }") ;;
+			@before\ *) BEFORE+=("${line#@before }") ;;
+			@after\ *) AFTER+=("${line#@after }") ;;
 		esac
 	done < "$COMMANDS_FILE"
 fi
@@ -270,7 +278,25 @@ WORLD=$RUN_DIR/${LEVEL_NAME:-world}
 AUDIT_BEFORE=build/world-audit-$LOADER-$NODE.before
 AUDIT_AFTER=build/world-audit-$LOADER-$NODE.after
 
+# run_steps <before|after> <shell>...: each with bash from the repo root; returns 1 after the first that fails.
+run_steps() {
+	local kind=$1 step
+	shift
+	for step in "$@"; do
+		echo "dev-server-smoke: @$kind \$ $step" >&2
+		if ! bash -c "$step" >&2; then
+			echo "dev-server-smoke: @$kind step failed: $step" >&2
+			return 1
+		fi
+	done
+}
+
 mkdir -p build
+if ! run_steps before ${BEFORE[@]+"${BEFORE[@]}"}; then
+	run_steps after ${AFTER[@]+"${AFTER[@]}"} || true
+	echo "dev-server-smoke: NOTHING PROVEN (exit 2): an @before step failed" >&2
+	exit 2
+fi
 bash scripts/world-audit.sh snapshot "$WORLD" "$AUDIT_BEFORE"
 touch "$MARKER"
 
@@ -311,7 +337,8 @@ feed_console() {
 		while IFS= read -r cmd || [[ -n "$cmd" ]]; do
 			cmd=${cmd%$'\r'}
 			[[ -z "$cmd" || "$cmd" == \#* || "$cmd" == @expect\ * || "$cmd" == @reject\ * || "$cmd" == @allow-error\ * ||
-				"$cmd" == @exits-nonzero || "$cmd" == @gradle\ * || "$cmd" == @audit-allow\ * ]] && continue
+				"$cmd" == @exits-nonzero || "$cmd" == @gradle\ * || "$cmd" == @audit-allow\ * || "$cmd" == @before\ * ||
+				"$cmd" == @after\ * ]] && continue
 			if [[ "$cmd" == @wait\ * ]]; then
 				wait_for_line "${cmd#@wait }"
 				continue
@@ -335,6 +362,9 @@ feed_console | timeout $((BOOT_TIMEOUT + 180)) ./gradlew ":$LOADER:$NODE:runServ
 	> "$OUT" 2>&1
 status=$?
 set -e
+# Cleanup first, so no verdict below can skip it.
+after_status=0
+run_steps after ${AFTER[@]+"${AFTER[@]}"} || after_status=1
 
 if ! launched "$OUT"; then
 	echo "dev-server-smoke: NOTHING PROVEN (exit 2): the server never launched (gradle exit $status). Tail of $OUT:" >&2
@@ -348,6 +378,10 @@ if ! exit_verdict "$status" "$REFUSAL" >&2; then
 fi
 verdict_status=0
 verdict "$OUT" "$COMMANDS_FILE" || verdict_status=1
+if (( after_status != 0 )); then
+	echo "FAIL: an @after step failed; what it cleans up may still be there"
+	verdict_status=1
+fi
 bash scripts/world-audit.sh snapshot "$WORLD" "$AUDIT_AFTER"
 bash scripts/world-audit.sh compare "$AUDIT_BEFORE" "$AUDIT_AFTER" ${AUDIT_ALLOW[@]+"${AUDIT_ALLOW[@]}"} || verdict_status=1
 if (( verdict_status == 0 )); then

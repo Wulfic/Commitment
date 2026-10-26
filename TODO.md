@@ -919,9 +919,48 @@ NeoForge and Forge first** (step C.0), so Proof 2 runs on all nine loader × nod
       fabric 12, GameTests 5 of ours on all ten, 0 failed, no javac warnings.
       **Blast radius:** additive (a screen, a lang file, a test seam). The lift path is B.6's, already guarded and
       tested; the client test lifts only its own disposable world. **Rollback:** `git revert` of the C.4 commit.
-- [ ] C.5 Dev-server smokes `commit-flow.txt` and `locked-boot.txt` on each loader, and Proof 4
+- [x] C.5 Dev-server smokes `commit-flow.txt` and `locked-boot.txt` on each loader, and Proof 4
       on a vanilla server. Revert checks: comment out the gate and watch `locked-boot` go red;
       remove the heartbeat and watch the "no effect" GameTest go red; restore both. Record here.
+      **Plan (session 8, before code).** `commit-flow.txt` already runs on all ten pairs (C.3c). What's left:
+      1. **A locked boot from a real setup change** (C.2's locked boots use a damaged record). `dev-server-smoke.sh` gets
+         `@before <sh>` (run before the launch) and `@after <sh>` (run after the stop, whatever the verdict), with
+         `LOADER`/`NODE` exported to them. `scripts/checks/locked-config.txt`: `@before` writes
+         `config/commitment-smoke-locked.json` into the dev server dir, `@exits-nonzero`, `@expect setup changed since
+         /commit, refusing to load world`, `@expect Config added: config/commitment-smoke-locked.json`, `@reject Done (`,
+         `@after` removes that one file. `scripts/checks/config-restored.txt`: the next boot opens (`is committed and its
+         setup matches`, the guard silent), which is the screen's "put the setup back" path. Run as
+         `commit-smoke.sh commit-flow.txt locked-config.txt config-restored.txt` on all ten pairs.
+      2. **Proof 4, the guard with no mod:** `scripts/vanilla-guard-smoke.sh` (`NODE=<1.21.11|26.1.2|26.2|26.3>`):
+         the vanilla server jar from piston-meta (URL and SHA-1 from the version JSON, checked after download, kept in
+         `run/vanilla/<node>/server.jar`), a marked copy of that node's Fabric dev world with the golden guard pack in
+         `run/vanilla/<node>/world`, the dev port, `eula=true`; boot, `datapack list enabled`, wait past two guard
+         cycles, `stop`. `@expect` the pack enabled and `Commitment guard: Commitment is missing`; fail on a
+         function-load error. The copy is removed by marker after (same guard as `client-locked-smoke.sh`), with a
+         `--self-test`. Exit codes 0/1/2 as the other smokes.
+      3. **Revert checks:** the server gate's refusal turned into a load → `locked-config.txt` red (one pair); the
+         heartbeat's `alive` key renamed → the guard GameTests red (C.1 did this in session 5; redone and recorded).
+      **Not doing:** a player on the vanilla server (the penalty's `say` line is the proof the penalty function ran;
+      the effects are GameTest-proven in C.1); Quilt (Stage F boots the Fabric jar on Quilt).
+      **Blast radius:** dev run dirs only: one config file in `run/<l>/<n>/server/config` (removed by `@after`, and by
+      the next boot's check), a world copy under `run/vanilla/<node>` (marker-guarded removal), downloaded server jars
+      (checksummed). **Rollback:** `git revert` of the C.5 commit; `rm run/<l>/<n>/server/config/commitment-smoke-locked.json`.
+      **Done, session 8 (2026-10-26).** `dev-server-smoke.sh`: `@before`/`@after` (`LOADER`/`NODE` exported; a failed
+      `@before` is exit 2 after running the `@after`s; `@after` runs right after the stop, before any verdict, and a
+      failed one fails the run). `scripts/checks/locked-config.txt`, `config-restored.txt`. **Rung 3:** `commit-smoke.sh
+      commit-flow.txt locked-config.txt config-restored.txt` **exit 0 on all ten loader x node pairs** (30 boots, 3 PASS
+      and 3 files removed per pair): boot 2 exits 1 before the world loads with `setup changed since /commit, refusing
+      to load world`, `Config added: config/commitment-smoke-locked.json` and `put the setup back, or start the 24-hour
+      unlock`; boot 3 `world is committed and its setup matches`; no smoke config file or mirror left anywhere.
+      **Proof 4:** `scripts/vanilla-guard-smoke.sh` (`--self-test` 5 cases, run by `dev-server-smoke.sh --self-test`)
+      **exit 0 on 1.21.11, 26.1.2, 26.2, 26.3**: Mojang's server jar (SHA-1 checked: 26.3 `33680f5f…`, 26.2 `823e2250…`,
+      26.1.2 `97ccd4c0…`, 1.21.11 `64bb6d76…`), no loader, `There are 2 data pack(s) enabled: [vanilla (built-in)],
+      [file/commitment_guard.zip (world)]`, `[Server] Commitment guard: Commitment is missing` within 2 s; copies
+      removed. **Revert checks, each red and restored (`cmp`):** the server gate's refusal made a load →
+      `locked-config` exit 1 ("expected to refuse … but runServer exited 0"; `@after` still removed the file); the
+      heartbeat writing `beating` instead of `alive` → `:fabric:26.3:runGameTest` "2 failed"; no guard pack in the
+      vanilla copy → vanilla smoke exit 1 (no pack line, no guard line). `./gradlew build` exit 0 on 13 nodes: common 268
+      per node, fabric 12, GameTests 5 of ours on all ten, 0 failed, no javac warnings.
 - [ ] C.6 World settings, reverted live (owner, session 3). Facts first from each node's jar: how
       game rules are enumerated and set (26.x registry-based rules), where `/difficulty`, the
       difficulty button and Open to LAN's cheats toggle write, and whether hardcore can be set back.

@@ -1,0 +1,10 @@
+# C.5, boot 3 of 3 (after locked-config.txt, through the wrapper): the added config file is gone again, so the setup is
+# the committed one and the world opens, with the guard live and silent. Run in order:
+#   LOADER=<fabric|neoforge|forge> NODE=<1.21.11 (fabric only)|26.1.2|26.2|26.3> bash scripts/commit-smoke.sh \
+#       scripts/checks/commit-flow.txt scripts/checks/locked-config.txt scripts/checks/config-restored.txt
+@before test ! -e "run/$LOADER/$NODE/server/config/commitment-smoke-locked.json"
+@sh sleep 5
+@expect Commitment: world is committed and its setup matches
+@expect Commitment: world world is committed; heartbeat on
+@reject Commitment guard: Commitment is missing
+@reject refusing to load
