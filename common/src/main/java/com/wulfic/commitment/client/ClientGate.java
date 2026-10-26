@@ -62,7 +62,10 @@ public final class ClientGate {
 			WorldGate.Verdict verdict) {
 		switch (verdict) {
 			case WorldGate.Verdict.Uncommitted() -> open(flows, levelId, onCancel);
-			case WorldGate.Verdict.Open matches -> open(flows, levelId, onCancel);
+			case WorldGate.Verdict.Open matches -> {
+				Commitment.LOGGER.info("Commitment: {} is committed and its setup matches", levelId);
+				open(flows, levelId, onCancel);
+			}
 			case WorldGate.Verdict.Lift lift -> {
 				Optional<String> failure = WorldGate.lift(world, CommitmentServer.store(), lift.record());
 				if (failure.isPresent()) {

@@ -1,0 +1,14 @@
+# C.1 and C.3c, boot 2 (after commit-flow.txt, through the wrapper): the world /commit confirm committed opens at the
+# next boot (the gate's scan matches /commit's), the heartbeat is on, the guard pack is enabled, and every 2 s the
+# guard finds the heartbeat and stays silent. Run the boots through the wrapper, which cleans up after:
+#   LOADER=<fabric|neoforge|forge> NODE=<1.21.11 (fabric only)|26.1.2|26.2|26.3> bash scripts/commit-smoke.sh
+# The guard firing without the mod is Proof 4 (a vanilla server), C.5.
+@sh sleep 5
+data get storage commitment:guard
+datapack list enabled
+@expect Commitment: world is committed and its setup matches
+@expect Commitment: world world is committed; heartbeat on
+@expect Storage commitment:guard has the following contents: \{alive: 1b\}
+@expect There are [0-9]+ data pack\(s\) enabled: .*file/commitment_guard\.zip
+@reject Commitment guard: Commitment is missing
+@reject Commitment: no lock record can be trusted

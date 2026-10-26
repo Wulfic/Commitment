@@ -1,7 +1,7 @@
 # C.2, the server gate, boot 1 of 3. The wrapper puts the golden guard pack in the world and nothing else, so the world
 # is committed with a record that can't be trusted: locked whatever its setup. The gate logs why and the server exits 1
 # before the world loads. Run the three boots through the wrapper, in order:
-#   LOADER=<fabric|neoforge|forge> NODE=<26.1.2|26.2|26.3> bash scripts/guard-pack-smoke.sh \
+#   LOADER=<fabric|neoforge|forge> NODE=<1.21.11 (fabric only)|26.1.2|26.2|26.3> bash scripts/guard-pack-smoke.sh \
 #       scripts/checks/locked-boot.txt scripts/checks/locked-unlock.txt scripts/checks/locked-cancel.txt
 @exits-nonzero
 @allow-error Commitment: setup changed since /commit, refusing to load world

@@ -18,6 +18,9 @@
 #   @exits-nonzero     the server is expected to stop by itself with a non-zero exit (a refusal); a timeout still fails
 #   @gradle <arg>      passed to Gradle, e.g. @gradle -Pcommitment.unlock=start (each loader's run forwards it)
 #   @audit-allow <re>  a world path the check's own @sh steps change on purpose (see the world audit below)
+#   @wait <regex>      hold the next command until this run's log has a line matching this (up to WAIT_TIMEOUT s,
+#                      default 90), for a reply that comes later than the command; counts as an @expect too.
+#                      Pick a pattern that only that step's reply prints: an earlier line of this boot matches as well
 #   # comment, blank   ignored
 #
 # Every run audits the world folder (scripts/world-audit.sh, TODO.md C.2b): a snapshot before the launch and after
@@ -51,6 +54,7 @@ verdict() {
 			case "$line" in
 				@allow-error\ *) allowed+=("${line#@allow-error }") ;;
 				@expect\ *) expected+=("${line#@expect }") ;;
+				@wait\ *) expected+=("${line#@wait }") ;;
 				@reject\ *) rejected+=("${line#@reject }") ;;
 				@exits-nonzero) refusal=yes ;;
 			esac
@@ -151,6 +155,9 @@ self_test() {
 	check 1 "a FATAL with no Done fails" "$dir/fatal-no-done.log"
 	check 1 "no boot line fails" "$dir/no-boot.log"
 	check 1 "an unmatched @expect fails" "$dir/good.log" "$dir/expect.txt"
+	printf '%s\n' '@wait Commitment: world committed' > "$dir/wait.txt"
+	check 1 "an @wait that never matched fails" "$dir/good.log" "$dir/wait.txt"
+	check 0 "a matched @wait passes" "$dir/expected.log" "$dir/wait.txt"
 	check 0 "a matched @expect passes" "$dir/expected.log" "$dir/expect.txt"
 	check 0 "a CRLF commands file still matches" "$dir/expected.log" "$dir/expect-crlf.txt"
 	check 0 "@allow-error lets a named ERROR through" "$dir/error.log" "$dir/allow.txt"
@@ -196,6 +203,7 @@ self_test() {
 	exit_check 1 "@exits-nonzero: a timeout fails" 124 yes
 	rm -rf "$dir"
 	bash scripts/world-audit.sh --self-test || failures=$((failures + 1))
+	bash scripts/commit-smoke.sh --self-test || failures=$((failures + 1))
 	if (( failures > 0 )); then
 		echo "self-test: $failures failed"
 		return 1
@@ -211,6 +219,7 @@ fi
 LOADER=${LOADER:-fabric}
 NODE=${NODE:-26.3}
 BOOT_TIMEOUT=${BOOT_TIMEOUT:-420}
+WAIT_TIMEOUT=${WAIT_TIMEOUT:-90}
 COMMANDS_FILE=${1:-}
 PORT=$(grep -E '^dev_server_port=' gradle.properties | cut -d= -f2 | tr -d '[:space:]')
 RUN_DIR=run/$LOADER/$NODE/server
@@ -264,6 +273,21 @@ mkdir -p build
 bash scripts/world-audit.sh snapshot "$WORLD" "$AUDIT_BEFORE"
 touch "$MARKER"
 
+# wait_for_line <regex>: an @wait step. Polls this run's log; on a timeout it says so and lets the commands go on,
+# and the verdict fails the unmatched @wait.
+wait_for_line() {
+	local re=$1 waited=0
+	until grep -qE -- "$re" "$LOG" 2>/dev/null; do
+		if (( waited >= WAIT_TIMEOUT )); then
+			echo "dev-server-smoke: @wait gave up after ${WAIT_TIMEOUT}s: $re" >&2
+			return
+		fi
+		sleep 1
+		waited=$((waited + 1))
+	done
+	echo "dev-server-smoke: @wait matched after ${waited}s: $re" >&2
+}
+
 # Writes the server's stdin, and holds it open until "stop": waits for this run's "Done (" line (the log has to be
 # newer than the marker, or it's the previous run's), sends the commands, then "stop".
 feed_console() {
@@ -287,6 +311,10 @@ feed_console() {
 			cmd=${cmd%$'\r'}
 			[[ -z "$cmd" || "$cmd" == \#* || "$cmd" == @expect\ * || "$cmd" == @reject\ * || "$cmd" == @allow-error\ * ||
 				"$cmd" == @exits-nonzero || "$cmd" == @gradle\ * || "$cmd" == @audit-allow\ * ]] && continue
+			if [[ "$cmd" == @wait\ * ]]; then
+				wait_for_line "${cmd#@wait }"
+				continue
+			fi
 			if [[ "$cmd" == @sh\ * ]]; then
 				echo "dev-server-smoke: \$ ${cmd#@sh }" >&2
 				bash -c "${cmd#@sh }" >&2 || echo "dev-server-smoke: @sh step failed: ${cmd#@sh }" >&2

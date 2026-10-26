@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
-# Live proof for the guard datapack with Commitment present (C.1): zips the pack's golden files
-# (common/src/test/resources/guard-pack, which GuardPackTest holds to the generator) into the dev world's datapacks/,
-# runs dev-server-smoke.sh once per commands file given (default scripts/checks/guard-pack.txt), then removes what
-# the run left: the zip it wrote, and the lock record and mirror the mod wrote when it found the pack. Only files that
-# carry Commitment's marker go.
+# Live proof for a world whose lock record is gone (C.2's locked boots): zips the guard pack's golden files
+# (common/src/test/resources/guard-pack, which GuardPackTest holds to the generator) into the dev world's datapacks/
+# and nothing else, so the world is committed with no record to trust, and the gate refuses it. Runs
+# dev-server-smoke.sh once per commands file given (default scripts/checks/locked-boot.txt), then removes what the run
+# left: the zip it wrote, and the lock record and mirror the mod wrote when it found the pack. Only files that carry
+# Commitment's marker go. A world committed with /commit confirm is scripts/commit-smoke.sh's.
 #
 #   LOADER=fabric NODE=26.3 bash scripts/guard-pack-smoke.sh
-#   LOADER=fabric NODE=26.3 bash scripts/guard-pack-smoke.sh scripts/checks/guard-disable.txt scripts/checks/guard-reenable.txt
+#   LOADER=fabric NODE=26.3 bash scripts/guard-pack-smoke.sh scripts/checks/locked-boot.txt scripts/checks/locked-unlock.txt scripts/checks/locked-cancel.txt
 #
 # Exit codes are dev-server-smoke.sh's: 0 proven · 1 the pack or the mod is bad · 2 nothing proven.
 set -euo pipefail
@@ -87,7 +88,7 @@ trap cleanup EXIT
 # One boot per commands file, in order, over the same world (a later boot sees what an earlier one left); the first
 # boot that doesn't prove its checks ends the run with its exit code.
 status=0
-for commands in "${@:-scripts/checks/guard-pack.txt}"; do
+for commands in "${@:-scripts/checks/locked-boot.txt}"; do
 	echo "guard-pack-smoke: boot with $commands"
 	set +e
 	bash scripts/dev-server-smoke.sh "$commands"

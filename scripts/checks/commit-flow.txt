@@ -1,0 +1,32 @@
+# C.3c, boot 1: /commit and /unlock typed into a dedicated server's console, on an uncommitted dev world. Each @wait
+# holds the next command until the reply is in, since the work runs off the server thread. /unlock confirm needs
+# internet. Run through the wrapper, which refuses on leftovers and removes this lock's three files after:
+#   LOADER=<fabric|neoforge|forge> NODE=<1.21.11 (fabric only)|26.1.2|26.2|26.3> bash scripts/commit-smoke.sh
+commit status
+@wait Commitment: to Server: Commitment: this world isn't committed
+commit confirm
+@wait Commitment: to Server: Commitment: nothing to confirm; run /commit first
+commit
+@wait Commitment: to Server: Run /commit confirm within 60 s
+commit confirm
+@wait Commitment: to Server: Commitment: world committed \(
+datapack list enabled
+commit
+@wait Commitment: to Server: Commitment: this world is already committed
+unlock
+@wait Commitment: to Server: Commitment: /unlock confirm starts the 24-hour unlock
+unlock confirm
+@wait Commitment: to Server: Commitment: (unlock available at|can't start the unlock)
+commit status
+@wait Commitment: to Server: Commitment: unlock available at .* left\)
+unlock cancel
+@wait Commitment: to Server: Commitment: unlock cancelled
+@expect Commitment: to Server: Commitment: /commit locks this world's setup: [0-9]+ mods?, [0-9]+ resource packs?, [0-9]+ config files?
+@expect Commitment: wrote lock record .*commitment\.dat \(lock [0-9a-f-]+, revision 1\)
+@expect Commitment: wrote lock mirror .*mirror.[0-9a-f-]+\.dat \(revision 1\)
+@expect Commitment: wrote guard pack .*commitment_guard\.zip
+@expect There are [0-9]+ data pack\(s\) enabled: .*file/commitment_guard\.zip
+@expect Commitment: to Server: Commitment: unlock available at .* \(24h\)
+@expect Commitment: to Server: Commitment: unlock cancelled; the world stays committed
+@reject Commitment guard: Commitment is missing
+@reject Commitment: .* failed \(

@@ -62,6 +62,8 @@ remappedSrc/
 .settings/
 .factorypath
 *.code-workspace
+# Eclipse launch configs ForgeGradle writes into each node at IDE sync.
+*.launch
 
 ############################
 # Python (repo tooling and harness scripts)

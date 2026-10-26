@@ -356,3 +356,16 @@ rewrite their own configs" signal comes from.
 **Rejected:** Owner importing a prepared instance into Prism (every restart needs them). Handmade packs only (less
 realistic).
 **Affects:** TODO E.1, run/packs/
+
+## 2026-10-26 — guard-pack.txt becomes guard-live.txt; Claude picks the Stage E packs
+**Context:** C.2's gate refuses a world holding only the golden guard pack, so C.1's `scripts/checks/guard-pack.txt`
+can't pass. Its checks belong on a world committed with `/commit confirm` (C.3c). Deleting a test is an absolute stop.
+Separately, E.1 needs a premade Modrinth vanilla+ pack per 26.x node and loader.
+**Choice:** Owner (session 8): `git mv guard-pack.txt guard-live.txt`, rewritten for the committed world, every old
+check kept. For E.1, the agent picks the most-downloaded Modrinth vanilla+ pack per node and loader, records the
+pick and its version id in TODO.md, and makes a small handmade pack where none exists.
+**Why:** A rename keeps the coverage and the file's history; the golden-pack wrapper stays for the locked-* boots,
+where a golden-only world is exactly the damaged-record case.
+**Rejected:** Delete and re-add (loses history). Keep guard-pack.txt as a second refusal check (duplicates
+locked-boot.txt). The owner naming each pack (blocks E.1 on a question).
+**Affects:** scripts/checks/guard-live.txt, scripts/commit-smoke.sh, scripts/guard-pack-smoke.sh, TODO C.3c and E.1

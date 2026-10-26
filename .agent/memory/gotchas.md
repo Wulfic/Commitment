@@ -239,3 +239,12 @@ mutation: another path → "Refusing to delete") before `runGameTest`, and every
 lock mirrors into its own wiped run dir instead of the shared `run/<loader>/<node>/mirror`, so a test that fails
 midway can't leave a mirror the dev-server smokes then refuse to run over.
 **Affects:** fabric/build.gradle, neoforge/build.gradle, forge/build.gradle, CommandsGameTest
+
+## 2026-10-26 — A mutation's "check" that uses the same pattern as the mutation proves nothing
+**Symptom:** A mutation of `dev-server-smoke.sh` (delete the `@wait` → expectation line) looked green, and
+`grep -c` with the same escaped pattern printed 0, which read as "the line is gone".
+**Cause:** The `sed` pattern (`@wait\ \*) expected+=`) matched nothing, and the `grep -c` meant to confirm the
+deletion used the same broken pattern, so it also matched nothing. The file was unchanged.
+**Fix:** Mutate into a copy and `diff` it against the original before running anything; a mutation with no diff
+lines didn't happen. Prefer loose patterns (`/@wait.*expected+=/d`) over escaped literal ones.
+**Affects:** every mutation check (see 2026-10-22, "A mutation that didn't apply looks like a green mutation check")

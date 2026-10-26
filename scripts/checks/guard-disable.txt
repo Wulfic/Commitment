@@ -1,7 +1,7 @@
-# C.1, boot 1 of 2: disables the guard pack the way a player with cheats would. Vanilla keeps it on the world's
-# disabled list at stop, so the next boot doesn't enable it by itself. Run both boots through the wrapper, in order:
-#   LOADER=<fabric|neoforge|forge> NODE=<26.1.2|26.2|26.3> bash scripts/guard-pack-smoke.sh \
-#       scripts/checks/guard-disable.txt scripts/checks/guard-reenable.txt
+# C.1, boot 3 of 4 (after commit-flow.txt and guard-live.txt, through the wrapper): disables the guard pack of the
+# committed world the way a player with cheats would. Vanilla keeps it on the world's disabled list at stop, so the
+# next boot doesn't enable it by itself. Run the boots through the wrapper, in order (its default):
+#   LOADER=<fabric|neoforge|forge> NODE=<1.21.11 (fabric only)|26.1.2|26.2|26.3> bash scripts/commit-smoke.sh
 @sh sleep 5
 datapack disable "file/commitment_guard.zip"
 datapack list available

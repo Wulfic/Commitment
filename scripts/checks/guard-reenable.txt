@@ -1,5 +1,5 @@
-# C.1, boot 2 of 2 (after guard-disable.txt, through the wrapper): the guard pack is on the world's disabled list, so
-# vanilla leaves it off. The mod turns it back on at server start, and the guard stays silent.
+# C.1, boot 4 of 4 (after guard-disable.txt, through scripts/commit-smoke.sh): the guard pack is on the world's
+# disabled list, so vanilla leaves it off. The mod turns it back on at server start, and the guard stays silent.
 @sh sleep 5
 datapack list enabled
 @expect Commitment: world world is committed; heartbeat on

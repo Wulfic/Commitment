@@ -747,7 +747,7 @@ NeoForge and Forge first** (step C.0), so Proof 2 runs on all nine loader × nod
       (the file removed afterwards).
       `./gradlew build` exit 0 on all 13 nodes: common **246** per node (`FileWritersTest` on each), fabric 12, GameTests 4
       of ours on all ten, 0 failed, no javac warnings.
-- [ ] C.3 Commands per the spec, registered through the platform seam. Server GameTests: every
+- [x] C.3 Commands per the spec, registered through the platform seam. Server GameTests: every
       transition, each message, the 60 s confirm expiry, a non-host refused.
       **Design:** the Brigadier tree in common (`command/CommitmentCommands`), registered by Fabric's
       `CommandRegistrationCallback`, NeoForge's and Forge's `RegisterCommandsEvent`. Allowed: the console, the integrated
@@ -817,6 +817,36 @@ NeoForge and Forge first** (step C.0), so Proof 2 runs on all nine loader × nod
       and restored:** Fabric registration removed ("Unknown or incomplete command"); no heartbeat on commit; no
       `select` on commit; anyone allowed. `./gradlew build` exit 0 on 13 nodes: GameTests **5 of ours and 1 others, 0
       failed, on all ten**; common 266, fabric 12; shared mirror dirs empty after; no javac warnings.
+      **C.3c, session 8 (2026-10-26), in progress (uncommitted):** owner: `guard-pack.txt` renamed (`git mv`) to
+      `guard-live.txt`, every check kept (decisions.md 2026-10-26). `WorldGateClientGameTest` now commits through chat:
+      cheats off (`adjustSettings(setAllowCommands(false))`, asserted on the server), `/commit` then `/commit confirm` by
+      `sendCommand`, each waiting for its reply through `ClientReceiveMessageEvents.GAME` (no fixed tick waits); record,
+      pack, pack enabled and heartbeat checked; a config file committed with the world (the preview must count it, so a
+      `/commit` scanning another dir can't pass); cleanup finds the lock id read-only (pack, else the record) and runs on
+      failure too (a leaked mirror would commit the next run's world: same folder name and seed). `ClientGate` logs
+      `<world> is committed and its setup matches` on the pass path, as `ServerGate` does. `dev-server-smoke.sh`: `@wait
+      <regex>` (holds the next command until the log has the reply; counts as an `@expect`); self-test 23 cases plus
+      `world-audit` and `commit-smoke`. `scripts/commit-smoke.sh` (+ `--self-test`, 14 cases): refuses on leftovers,
+      boots `commit-flow.txt guard-live.txt guard-disable.txt guard-reenable.txt`, removes a file only with Commitment's
+      marker and this run's lock id, paths asserted inside `run/<l>/<n>`. `guard-pack-smoke.sh` keeps the locked boots
+      (default `locked-boot.txt`). **Runs:** `:fabric:26.3:runClientGameTest` exit 0 (`1 config file`, `New World (1) is
+      committed and its setup matches`, `locked screen (1 changes)`, `client gate check: PASS`, mirror removed).
+      **Mutations, each red and restored (`cmp`):** `/commit` scanning the game dir's parent → red at the preview ("0
+      config files"); the same with the preview check relaxed → red at the reopen (`locked screen (3 changes)`); `@wait`
+      not counted as an expectation → self-test red (a first try whose `sed` matched nothing looked green: diff every
+      mutation); commit-smoke: lock-id compare off → 2 red, `inside` always true → 3, record magic off → 1, pack marker
+      off → 1.
+      **C.3c done, session 8.** Rung 5: `:fabric:<n>:runClientGameTest` **exit 0 on 1.21.11, 26.1.2, 26.2, 26.3**: the
+      preview counts the committed config file (2 on 1.21.11, where something writes one more), `New World (1) is
+      committed and its setup matches`, `locked screen (1 changes)`, `client gate check: PASS`, mirror dirs empty.
+      Rung 3: `bash scripts/commit-smoke.sh` **exit 0 on all ten loader x node pairs** (fabric 1.21.11/26.1.2/26.2/26.3,
+      neoforge and forge 26.1.2/26.2/26.3): 40 boots, 40 `dev-server-smoke: PASS`, 40 audits clean, 3 files removed
+      per pair by marker + lock id; matched on each: every `@wait` reply, `wrote lock record/mirror/guard pack`, the
+      pack enabled at once, `unlock available at … (24h)` then `(24h 0m left)`, `unlock cancelled`; boot 2 `world is
+      committed and its setup matches` (the dedicated server's commit scan equals its gate's) with `{alive: 1b}` and the
+      `@reject`s clean; boots 3–4 disable, then `enabling the guard pack … (it was disabled)`. No lock file left in
+      `run/` or `%LOCALAPPDATA%\Commitment`. `./gradlew build` exit 0 on 13 nodes: common **266** per node, fabric 12,
+      GameTests "5 of ours and 1 others ran, 0 failed" on all ten, no javac warnings.
       **Not doing in C.3:** world settings (C.6), the LockedScreen (C.4), `locked-boot` from a config change (C.5).
       **Blast radius:** `/commit confirm` writes Commitment's three files in dev worlds and `run/<l>/<n>/mirror` only;
       the smoke wrapper removes only files carrying the marker and the run's lock id, after its own refusal on leftovers.
@@ -828,6 +858,42 @@ NeoForge and Forge first** (step C.0), so Proof 2 runs on all nine loader × nod
       player can't reach from a refused world: the screen says "Start 24-hour unlock" and has the button.
       NeoForge and Forge have no client GameTest, so `:<node>:runClient` on a disposable world,
       with that line read from the log and recorded here.
+      **Facts (javap, session 8, Mojang-named client jars 1.21.11/26.1.2/26.2/26.3):** drawing differs: 1.21.11 has
+      `Screen.render(GuiGraphics, int, int, float)`, 26.x replaced it with `extractRenderState(GuiGraphicsExtractor, …)`.
+      The widgets and layouts are the same on all four (newer nodes only add methods): `MultiLineTextWidget(Component,
+      Font)` + `setMaxWidth/setCentered`, `StringWidget(Component, Font)` + `setMessage`, `HeaderAndFooterLayout`,
+      `LinearLayout`, `ScrollableLayout(Minecraft, Layout, int)` + `setMaxHeight`, `ConfirmScreen(BooleanConsumer,
+      Component, Component[, Component, Component])`, `Screen.tick/init/onClose/shouldCloseOnEsc/addRenderableWidget`
+      (26.x dropped `StringWidget.clipText`). So the LockedScreen is built from widgets and layouts only, never
+      overriding the draw method: one source for every node, no version blocks. The countdown updates its
+      `StringWidget` from `tick()`.
+      **Plan (session 8, before code):**
+      1. `client/LockedScreen` (common): `HeaderAndFooterLayout`; header: the title ("This world is committed: its
+         setup changed", or "Commitment can't check this world"); body: a `ScrollableLayout` over the diff lines
+         (already capped by `ManifestDiff`), then the timer line; footer: **Back** (`onCancel`, as today), and
+         **Start 24-hour unlock** with no timer, **Cancel unlock** with one, **Open world** once a running timer's
+         countdown reaches zero (re-runs the gate, which lifts). A refusal for a failed check has Back only.
+      2. Start → vanilla `ConfirmScreen` ("Start the 24-hour unlock?", that internet time times it and the lock lifts
+         at the first open after it). Yes, or Cancel unlock → `CommitActions.unlock` / `cancel` on a Commitment daemon
+         thread (seed from `WorldSeed`), result on the render thread → the gate runs again (`ClientGate.check`), so the
+         screen always shows the saved state. No internet time → the refusal text from `UnlockTimer.message`.
+      3. Countdown: display only, from the verdict's `availableAt` and the internet time the gate read, moved on by
+         `System.nanoTime()`; the lift itself is still decided by internet time at the next open.
+      4. Strings as translatable components in `assets/commitment/lang/en_us.json` (the client test clicks buttons by
+         key, as it does `gui.back`); logs stay English. `Commitment: locked screen (<n> changes)` kept.
+      5. A test seam for the gate's clock, as `CommitmentCommands.useTestClocks` (development runs only; refused
+         otherwise, with its JUnit).
+      6. `WorldGateClientGameTest` (every Fabric node): the locked world shows `LockedScreen` with the added config
+         file listed; Start → confirm → countdown + Cancel unlock (test clock); Cancel → Start again; Start, then the
+         clock moved 24 h on → reopen lifts: the world opens, `lock lifted` logged, the three files renamed
+         `*.lifted`. Mutations: the Start button's action off; the countdown's zero branch off; the lift skipped.
+      7. NeoForge and Forge (no client GameTest): `:<loader>:<node>:runClient` with `--quickPlaySingleplayer` on a
+         disposable committed world under `run/<l>/<n>/client`, `@expect`-style read of `locked screen (1 changes)`
+         from the log, then stop the PID this run started (never `java` by name). Recorded per node.
+      **Not doing:** a lock icon in the world list; blocking the resource-pack or config screens; the lift's own
+      files (B.6, unchanged).
+      **Blast radius:** additive (a screen, a lang file, a test seam). The lift path is B.6's, already guarded and
+      tested; the client test lifts only its own disposable world. **Rollback:** `git revert` of the C.4 commit.
 - [ ] C.5 Dev-server smokes `commit-flow.txt` and `locked-boot.txt` on each loader, and Proof 4
       on a vanilla server. Revert checks: comment out the gate and watch `locked-boot` go red;
       remove the heartbeat and watch the "no effect" GameTest go red; restore both. Record here.
