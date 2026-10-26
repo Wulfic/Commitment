@@ -1,0 +1,18 @@
+{
+  "commitment.screen.checking": "Commitment: checking this world's setup...",
+  "commitment.screen.working": "Commitment: saving the unlock timer...",
+  "commitment.locked.title": "This world is committed: its setup changed",
+  "commitment.locked.hint": "Put the setup back the way it was committed, or start the 24-hour unlock.",
+  "commitment.locked.no_timer": "No unlock is running.",
+  "commitment.locked.pending": "Unlock available at %s (%s left). The lock lifts the first time you open the world after that.",
+  "commitment.locked.due": "The 24 hours are up: open the world to lift the lock.",
+  "commitment.locked.unverified": "The unlock was due at %s, but internet time can't be checked (%s), so the world stays locked.",
+  "commitment.locked.start": "Start 24-hour unlock",
+  "commitment.locked.cancel": "Cancel unlock",
+  "commitment.locked.open": "Open world",
+  "commitment.locked.retry": "Try again",
+  "commitment.locked.confirm.title": "Start the 24-hour unlock?",
+  "commitment.locked.confirm.text": "The unlock is timed by internet time. Once 24 hours have passed, the lock lifts the next time you open this world, and its setup is yours to change. You can cancel the unlock before then.",
+  "commitment.locked.failed.title": "Commitment can't check this world",
+  "commitment.locked.failed.closed": "The world stays closed until it can be checked."
+}

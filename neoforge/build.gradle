@@ -80,6 +80,11 @@ neoForge {
 		client {
 			client()
 			gameDirectory = new File(runRoot, "client")
+			// `-Pcommitment.quickPlay=<world>` (scripts/client-locked-smoke.sh): opens that saved world at launch through
+			// vanilla's own openWorld, so the client gate runs with no one at the keyboard.
+			if (providers.gradleProperty('commitment.quickPlay').isPresent()) {
+				programArguments.addAll '--quickPlaySingleplayer', providers.gradleProperty('commitment.quickPlay').get()
+			}
 		}
 		server {
 			server()
@@ -175,6 +180,7 @@ processResources {
 			version        : project.version,
 			minecraftRange : project.property("neoforge_minecraft_range.$band"),
 			neoforgeVersion: project.property("neoforge_version.$band"),
+			iconKey        : project.property("neoforge_icon_key.$band"),
 	]
 	inputs.properties properties
 

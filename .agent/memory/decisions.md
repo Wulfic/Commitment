@@ -369,3 +369,19 @@ where a golden-only world is exactly the damaged-record case.
 **Rejected:** Delete and re-add (loses history). Keep guard-pack.txt as a second refusal check (duplicates
 locked-boot.txt). The owner naming each pack (blocks E.1 on a question).
 **Affects:** scripts/checks/guard-live.txt, scripts/commit-smoke.sh, scripts/guard-pack-smoke.sh, TODO C.3c and E.1
+
+## 2026-10-26 — The LockedScreen is vanilla widgets only; its buttons reuse /unlock's code and re-run the gate
+**Context:** C.4 replaces C.2's interim AlertScreen. Screen drawing differs by node: 1.21.11 overrides
+`render(GuiGraphics, …)`, 26.x `extractRenderState(GuiGraphicsExtractor, …)` (javap, all four client jars).
+**Choice:** Build it from `HeaderAndFooterLayout`, `ScrollableLayout`, `MultiLineTextWidget`, `Button` and vanilla's
+`ConfirmScreen` (identical on all four nodes), never overriding the draw method: one source, no version blocks. Start
+and Cancel call `CommitActions.unlock` / `cancel` (the code `/unlock` runs) off the render thread, then the gate runs
+again, so the screen always shows what was saved. The countdown is display only; the lift is still decided by
+internet time at the next open. Text lives in `assets/commitment/lang/en_us.json`; logs stay English.
+`ClientGate.useTestClock` is the client GameTest's clock seam, refused outside development like
+`CommitmentCommands.useTestClocks`.
+**Why:** A hand-drawn screen would need a `//? if` block per draw call on every node, and those are the calls most
+likely to move again. Reusing the commands' code keeps one path that saves a timer.
+**Rejected:** Version-blocked `render`/`extractRenderState` overrides. Having the screen write the record itself
+(a second timer path to keep in step). Literal strings (no translation; the client test clicks buttons by key).
+**Affects:** common/.../client/LockedScreen.java, ClientGate.java, assets/commitment/lang/en_us.json

@@ -81,6 +81,11 @@ minecraft {
 	runs {
 		register('client') {
 			workingDir = new File(runRoot, "client")
+			// `-Pcommitment.quickPlay=<world>` (scripts/client-locked-smoke.sh): opens that saved world at launch through
+			// vanilla's own openWorld, so the client gate runs with no one at the keyboard.
+			if (providers.gradleProperty('commitment.quickPlay').isPresent()) {
+				args '--quickPlaySingleplayer', providers.gradleProperty('commitment.quickPlay').get()
+			}
 		}
 		register('server') {
 			workingDir = new File(runRoot, "server")

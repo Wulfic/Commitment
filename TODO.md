@@ -852,7 +852,7 @@ NeoForge and Forge first** (step C.0), so Proof 2 runs on all nine loader × nod
       the smoke wrapper removes only files carrying the marker and the run's lock id, after its own refusal on leftovers.
       **Rollback:** `git revert` of the C.3 commits; a dev world committed by a failed run: the wrapper's cleanup, or the
       plan's rollback paths below.
-- [ ] C.4 The LockedScreen per node: diff, Back, start-unlock with confirm, countdown, cancel.
+- [x] C.4 The LockedScreen per node: diff, Back, start-unlock with confirm, countdown, cancel.
       It logs `Commitment: locked screen (<n> changes)`. Fabric client GameTest from Proof 6.
       Replaces C.2's interim `AlertScreen`, whose last line ("/unlock starts the 24-hour unlock") is a command the
       player can't reach from a refused world: the screen says "Start 24-hour unlock" and has the button.
@@ -892,6 +892,31 @@ NeoForge and Forge first** (step C.0), so Proof 2 runs on all nine loader × nod
          from the log, then stop the PID this run started (never `java` by name). Recorded per node.
       **Not doing:** a lock icon in the world list; blocking the resource-pack or config screens; the lift's own
       files (B.6, unchanged).
+      **Done, session 8 (2026-10-26).** `client/LockedScreen` + `ClientGate` (buttons through `CommitActions`, the gate
+      re-run after each; `useTestClock`, dev only), `UnlockTimer.left` (+ `when`/`remaining` public), `en_us.json`.
+      JUnit: `UnlockTimerTest.theCountdownMovesOnAndStopsAtZero`, `ClientGateTest.aReleasedGameRefusesTheTestClock`.
+      **Found live, fixed:** (1) screenshots from the client test showed the body never drew (scroll area 0 high: it
+      was sized before the body was arranged) while every button test passed. Fix: arrange, size, arrange; the test's
+      `checkShows` now requires each line inside a scroll area with room (mutation: one arrange → red at the first
+      line). (2) NeoForge 26.2/26.3 warn on `logoFile` and show a warnings screen at every launch; 26.1.2 knows only
+      `logoFile` (all three universal jars read): `neoforge_icon_key.<node>`. (3) A fresh dev client waits at
+      accessibility onboarding before Quick Play (gotchas.md).
+      **Rung 5, Fabric:** `:fabric:<n>:runClientGameTest` **exit 0 on 1.21.11, 26.1.2, 26.2, 26.3**: locked screen with
+      the added config file and "No unlock is running" shown; Start → confirm → timer at the test clock's time; Cancel
+      → cleared; Start again; offline clock → "internet time can't be checked", Try again → countdown; 2 s before due
+      the countdown hits zero and the button reads Open world, which still refuses; past due the next open lifts (3
+      files renamed `*.lifted`) and the world loads; mirror dirs empty. Screenshots read on 26.3 and 1.21.11 (same
+      layout on both draw pipelines). **NeoForge/Forge:** `scripts/client-locked-smoke.sh` (new; `--self-test` 5 cases,
+      run by `dev-server-smoke.sh --self-test`) **exit 0 on neoforge and forge 26.1.2/26.2/26.3**: Quick Play into a
+      copied world with only the golden pack, `no lock record can be trusted`, `locked screen (1 changes)`, `locked
+      screen shows 3 lines; buttons: Back, Start 24-hour unlock`, no loading warning, no world loaded; the game JVM
+      found by new PID + node path and stopped; copy and golden mirror removed. **Mutations, each red and restored
+      (`cmp`):** Start does nothing (timed out at the confirm); the countdown's zero branch off (no Open world button);
+      the lift skipped ("didn't rename the lock's files"); one arrange (line not shown); the Start lang key broken
+      (NeoForge smoke: `buttons: Back, commitment.locked.start`). Rung 3: `boot.txt` exit 0 on neoforge 26.1.2/26.2/
+      26.3 after the toml change, no `logoFile` warning. Jars: the lang file in all ten; `logoFile` in neoforge
+      26.1.2's toml, `iconFile` in 26.2's and 26.3's. `./gradlew build` exit 0 on 13 nodes: common **268** per node,
+      fabric 12, GameTests 5 of ours on all ten, 0 failed, no javac warnings.
       **Blast radius:** additive (a screen, a lang file, a test seam). The lift path is B.6's, already guarded and
       tested; the client test lifts only its own disposable world. **Rollback:** `git revert` of the C.4 commit.
 - [ ] C.5 Dev-server smokes `commit-flow.txt` and `locked-boot.txt` on each loader, and Proof 4

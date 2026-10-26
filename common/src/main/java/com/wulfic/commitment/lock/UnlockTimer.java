@@ -103,12 +103,21 @@ public final class UnlockTimer {
 		return requestedAt + WAIT.toMillis();
 	}
 
-	static String when(long epochMillis, ZoneId zone) {
+	public static String when(long epochMillis, ZoneId zone) {
 		return WHEN.format(Instant.ofEpochMilli(epochMillis).atZone(zone));
 	}
 
+	/**
+	 * What's left of a timer {@code elapsedNanos} after a reading said {@code atReading} was left, never below zero.
+	 * For a countdown on screen only: the lock itself lifts on a fresh internet-time reading.
+	 */
+	public static Duration left(Duration atReading, long elapsedNanos) {
+		Duration left = atReading.minusNanos(Math.max(0, elapsedNanos));
+		return left.isNegative() ? Duration.ZERO : left;
+	}
+
 	/** Rounded up to the minute, so the last 30 seconds don't read as "0m left". */
-	static String remaining(Duration d) {
+	public static String remaining(Duration d) {
 		long minutes = (d.toMillis() + 59_999) / 60_000;
 		return minutes >= 60 ? (minutes / 60) + "h " + (minutes % 60) + "m" : minutes + "m";
 	}

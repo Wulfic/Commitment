@@ -248,3 +248,27 @@ deletion used the same broken pattern, so it also matched nothing. The file was 
 **Fix:** Mutate into a copy and `diff` it against the original before running anything; a mutation with no diff
 lines didn't happen. Prefer loose patterns (`/@wait.*expected+=/d`) over escaped literal ones.
 **Affects:** every mutation check (see 2026-10-22, "A mutation that didn't apply looks like a green mutation check")
+
+## 2026-10-26 — A ScrollableLayout sized before its content is arranged is 0 high, and every button still works
+**Symptom:** C.4's LockedScreen showed its title and buttons but none of its body (the changes, the hint, the
+countdown). The client GameTest clicked every button through start, cancel and lift and stayed green.
+**Cause:** `ScrollableLayout.setMaxHeight` sets the container to `min(content height, max)`, and the content (a
+`LinearLayout`) has height 0 until `arrangeElements` runs. Called first, the container stays 0 high; `arrangeElements`
+only clamps the height it already has. Vanilla's `ExperimentsScreen` arranges, sets the max height, arranges again.
+**Fix:** `repositionElements` arranges twice around `setMaxHeight`. Found only by `context.takeScreenshot` in the
+client GameTest and reading the PNGs. The test now checks each expected line is laid out inside a scroll area with
+room (`checkShows`, public vanilla API only), and the screen logs `locked screen shows N lines; buttons: …` from the
+scroll area's real height (mutation: one arrange → red at the first line).
+**Affects:** common/.../client/LockedScreen.java, WorldGateClientGameTest
+
+## 2026-10-26 — A fresh dev client waits at accessibility onboarding; NeoForge 26.2+ warns on `logoFile`
+**Symptom:** `runClient --quickPlaySingleplayer <world>` on NeoForge sat after resource loading until the timeout.
+**Cause:** two screens in front of Quick Play. (1) NeoForge 26.2.0.93 / 26.3.0.95 log "Mod commitment uses the
+deprecated `logoFile` property" and show a mod-loading warnings screen at **every launch**, for players too.
+26.1.2.122 knows only `logoFile` (no `iconFile`/`bannerFile` in its jar). (2) A fresh client's `options.txt` has
+`onboardAccessibility:true`, and vanilla holds Quick Play behind the onboarding screen. Fabric's client GameTest
+turns onboarding off by itself, so it never showed there.
+**Fix:** `neoforge_icon_key.<node>` in gradle.properties (`logoFile` on 26.1.2, `iconFile` on 26.2+), expanded into
+neoforge.mods.toml. `client-locked-smoke.sh` sets `onboardAccessibility:false` in the dev client's own options.txt
+and fails on "Mod commitment uses" / "Mods loaded with N warning". Forge 26.x doesn't warn on `logoFile`.
+**Affects:** gradle.properties, neoforge/build.gradle, neoforge.mods.toml, scripts/client-locked-smoke.sh

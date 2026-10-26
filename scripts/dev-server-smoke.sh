@@ -204,6 +204,7 @@ self_test() {
 	rm -rf "$dir"
 	bash scripts/world-audit.sh --self-test || failures=$((failures + 1))
 	bash scripts/commit-smoke.sh --self-test || failures=$((failures + 1))
+	bash scripts/client-locked-smoke.sh --self-test || failures=$((failures + 1))
 	if (( failures > 0 )); then
 		echo "self-test: $failures failed"
 		return 1

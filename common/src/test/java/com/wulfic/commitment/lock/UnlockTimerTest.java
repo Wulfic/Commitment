@@ -171,6 +171,17 @@ class UnlockTimerTest {
 	}
 
 	@Test
+	void theCountdownMovesOnAndStopsAtZero() {
+		Duration atReading = Duration.ofMinutes(10);
+		assertEquals(atReading, UnlockTimer.left(atReading, 0));
+		assertEquals(Duration.ofMinutes(9), UnlockTimer.left(atReading, Duration.ofMinutes(1).toNanos()));
+		assertEquals(Duration.ZERO, UnlockTimer.left(atReading, Duration.ofMinutes(10).toNanos()));
+		assertEquals(Duration.ZERO, UnlockTimer.left(atReading, Duration.ofHours(1).toNanos()));
+		// A clock that went backwards never adds time.
+		assertEquals(atReading, UnlockTimer.left(atReading, -5));
+	}
+
+	@Test
 	void theLockedMessagePointsAtUnlock() {
 		assertSame(Status.Locked.class, UnlockTimer.status(committed(T0), internet).getClass());
 		assertTrue(UnlockTimer.message(new Status.Locked(), UTC).contains("/unlock"));

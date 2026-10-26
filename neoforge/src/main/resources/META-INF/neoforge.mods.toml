@@ -7,7 +7,7 @@ modId = "commitment"
 version = "${version}"
 displayName = "Commitment"
 authors = "wulfic"
-logoFile = "assets/commitment/icon.png"
+${iconKey} = "assets/commitment/icon.png"
 description = '''
 Commit a world to the mods, resource packs and config it was played with. Changing them later takes a 24-hour unlock.
 '''
