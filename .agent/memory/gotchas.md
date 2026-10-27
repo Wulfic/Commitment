@@ -314,3 +314,9 @@ and nothing put it back, then the cleanup removed the lock. The next `/commit` c
 **Fix:** `scripts/checks/tamper/01-commit.txt` sets random_tick_speed 3, difficulty easy, default gamemode survival
 before `/commit`. Any check that names a committed value sets it first.
 **Affects:** scripts/checks/tamper/01-commit.txt
+
+## 2026-10-27 — NeoForge writes neoforge-synced.toml after Commitment's setup check
+**Context:** D.1 row 08 (move the server's whole `config/` away) passed on Fabric, Quilt and Forge and failed on all three NeoForge nodes.
+**Finding:** at startup NeoForge writes `fml.toml` and `neoforge-local.toml` again before the world opens, but `neoforge-synced.toml` only later (it's a synced/server-type config, loaded with the world). So Commitment's check sees the committed file missing, logs `Config removed: config/neoforge-synced.toml` and refuses. That's fail closed, not a bypass: putting `config/` back (or the 24 h unlock) opens it. A NeoForge player who deletes `config/` is locked out of the committed world until the file comes back. Opening any uncommitted world once should write it again with defaults (not proven).
+**Rule:** a "the loader regenerates it" assumption is per loader and per config type: probe it on every loader. The matrix runs `scripts/checks/tamper/08-config-moved-neoforge.txt` for NeoForge pairs.
+**Affects:** scripts/tamper-matrix.sh, scripts/checks/tamper/08-config-moved*.txt, TODO.md threat table

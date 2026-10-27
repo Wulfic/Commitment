@@ -112,7 +112,7 @@ The player owns every file, so this is friction, not security. Each row is a Sta
 |---|---|
 | Delete or disable Commitment | The world opens, but the guard pack blinds and freezes the player with "reinstall Commitment". Nothing gets damaged |
 | Reinstall Commitment | The lock is back, and the timer state too |
-| Delete or edit `config/` | Nothing changes: no lock state lives there |
+| Delete or edit `config/` | No lock state lives there, but it's part of the committed setup. Fabric, Quilt and Forge write their config files again before the check, so the world opens. NeoForge writes `neoforge-synced.toml` only later, so the world is refused ("Config removed") until `config/` is put back or the 24 h unlock runs out. An edited file is refused on every loader |
 | Delete the guard datapack, mod present | The mod rebuilds it from the record at the next server start |
 | Delete the world's lock record, mod present | Restored from the mirror (matched by the lock id in the guard pack, or by seed + folder name) |
 | Hand-edit the lock record | HMAC fails, so that copy counts as damaged and the mirror's valid copy is written back. Edit **both** copies: treated as tampered, locked, and the only way out is the 24 h timer |
@@ -1095,7 +1095,7 @@ NeoForge and Forge first** (step C.0), so Proof 2 runs on all nine loader × nod
          | 05 | Delete record | mod, `@before delete-record` | `restoring .*commitment.dat from the mirror`, setup matches |
          | 06 | Delete record **and** pack | mod, both | restored via seed + folder from the mirror, pack rewritten |
          | 07 | Hand-edit record | mod, `edit-record` | restored from the mirror (record tampered), setup matches |
-         | 08 | Delete/edit `config/` | mod, `move-config` (restored by `@after`) | still committed (outcome per loader pinned after a probe: Fabric's is empty) |
+         | 08 | Delete/edit `config/` | mod, `move-config` (restored by `@after`) | still committed (outcome per loader pinned after a probe: Fabric's is empty). **Probe (matrix run 1):** NeoForge refuses, `Config removed: config/neoforge-synced.toml` (written after the check), so NeoForge pairs run `08-config-moved-neoforge.txt` |
          | 09 | Edit `server.properties` | mod, `edit-properties motd` | refuses, `server.properties: motd changed`, `@reject` the new value; `@after restore` |
          | 10–11 | `/datapack disable` | existing `guard-disable` / `guard-reenable` | re-enabled at start |
          | 12 | `/difficulty`, `/gamerule`, ... | existing `rules-revert` | put back within 1 s |
@@ -1116,6 +1116,11 @@ NeoForge and Forge first** (step C.0), so Proof 2 runs on all nine loader × nod
       and `cmp`-verified in `tamper-backup/` first; vanilla boots on a Forge/NeoForge dev world may drop loader tags
       from its `level.dat` (dev worlds, regenerable). Downloads checksummed. **Rollback:** `tamper.sh restore` per pair;
       `git revert` of the D commits; `rm -r run/quilt` (built from scratch).
+      **Runs.** Matrix run 1 (`bash scripts/tamper-matrix.sh`, ae07669, exit 1): fabric 1.21.11/26.1.2/26.2/26.3, forge
+      26.1.2/26.2/26.3 and quilt 26.1.2/26.2/26.3 exit 0, 14/14 boots each (world audit clean on every boot); neoforge
+      26.1.2/26.2/26.3 exit 1, 7/14, at row 08 (`Config removed: config/neoforge-synced.toml`, see the row above), so
+      rows 09–14 are unproven on NeoForge. Run 2 (NeoForge pairs only, with `08-config-moved-neoforge.txt`): started at
+      session 9's end, result pending.
 
 ### Stage E: a real modpack (rung 7, on a copy)
 

@@ -1,0 +1,14 @@
+# D.1, tamper chain boot 8 on NeoForge (scripts/tamper-matrix.sh picks this one for NeoForge pairs). Row "Delete or
+# edit config/": the whole server config/ is moved away. NeoForge writes fml.toml and neoforge-local.toml again before
+# the setup check, but neoforge-synced.toml only later, so the committed file is missing: the world is refused (fail
+# closed, the timer still running) until config/ is put back. @after puts it back, and boot 9 opens normally.
+@before bash scripts/tamper.sh move-config
+@after bash scripts/tamper.sh restore config
+@exits-nonzero
+@allow-error Commitment: setup changed since /commit, refusing to load world
+@expect Commitment: setup changed since /commit, refusing to load world
+@expect Commitment: +Config removed: config/neoforge-synced\.toml
+@expect Commitment: unlock available at .* left\)
+@reject Commitment: +Config removed: config/(fml|neoforge-local)\.toml
+@reject Commitment: +Config (added|changed):
+@reject Done \(

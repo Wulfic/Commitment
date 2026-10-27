@@ -28,10 +28,13 @@ CHAIN=(
 	scripts/checks/tamper/13-both-edited.txt
 	scripts/checks/tamper/14-bypass.txt
 )
+# NeoForge writes config/neoforge-synced.toml only after the setup check, so with config/ moved away the world is
+# refused there instead of opening (08-config-moved-neoforge.txt says why).
+NEOFORGE_08=scripts/checks/tamper/08-config-moved-neoforge.txt
 ALL_PAIRS=(fabric:1.21.11 fabric:26.1.2 fabric:26.2 fabric:26.3 neoforge:26.1.2 neoforge:26.2 neoforge:26.3
 	forge:26.1.2 forge:26.2 forge:26.3 quilt:26.1.2 quilt:26.2 quilt:26.3)
 
-for f in "${CHAIN[@]}"; do
+for f in "${CHAIN[@]}" "$NEOFORGE_08"; do
 	[[ -f $f ]] || { echo "tamper-matrix: no $f" >&2; exit 2; }
 done
 if (( $# > 0 )); then PAIRS=("$@"); else PAIRS=("${ALL_PAIRS[@]}"); fi
@@ -49,20 +52,25 @@ worst=0
 for pair in "${PAIRS[@]}"; do
 	loader=${pair%%:*} node=${pair#*:}
 	log=build/tamper-matrix/$loader-$node.log
-	echo "tamper-matrix: $loader $node (${#CHAIN[@]} boots), log in $log"
+	chain=()
+	for f in "${CHAIN[@]}"; do
+		if [[ $loader == neoforge && $f == */08-config-moved.txt ]]; then f=$NEOFORGE_08; fi
+		chain+=("$f")
+	done
+	echo "tamper-matrix: $loader $node (${#chain[@]} boots), log in $log"
 	set +e
-	LOADER=$loader NODE=$node bash scripts/commit-smoke.sh "${CHAIN[@]}" > "$log" 2>&1
+	LOADER=$loader NODE=$node bash scripts/commit-smoke.sh "${chain[@]}" > "$log" 2>&1
 	status=$?
 	set -e
 	passed=$(grep -c '^dev-server-smoke: PASS' "$log" || true)
 	failing=""
 	if (( status != 0 )); then
 		# The boot after the last one that passed.
-		failing=${CHAIN[$passed]:-cleanup}
+		failing=${chain[$passed]:-cleanup}
 		failing=${failing##*/}
 	fi
-	echo "| $loader $node | $status | $passed / ${#CHAIN[@]} | ${failing:--} |" >> "$SUMMARY"
-	echo "tamper-matrix: $loader $node exit $status ($passed of ${#CHAIN[@]} boots passed${failing:+, first failing: $failing})"
+	echo "| $loader $node | $status | $passed / ${#chain[@]} | ${failing:--} |" >> "$SUMMARY"
+	echo "tamper-matrix: $loader $node exit $status ($passed of ${#chain[@]} boots passed${failing:+, first failing: $failing})"
 	if (( status == 1 )); then
 		worst=1
 	elif (( status != 0 && worst == 0 )); then
