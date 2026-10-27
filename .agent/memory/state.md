@@ -20,8 +20,9 @@
 
 ## Next
 1. **First:** look for a leftover dev-server JVM on port 25571 by command line (the session may have ended mid-run;
-   never kill java by name). Then read `build/tamper-matrix-neoforge-run.log`; if it's incomplete, rerun
-   `bash scripts/tamper-matrix.sh neoforge:26.1.2 neoforge:26.2 neoforge:26.3` (background, ~45 min).
+   never kill java by name). Then read `build/tamper-matrix-neoforge-run.log`; 26.1.2 failed there only because its late file
+   is `neoforge-server.toml` (check widened after), so rerun `bash scripts/tamper-matrix.sh neoforge:26.1.2`, plus
+   26.2/26.3 if their logs aren't 14/14 (background, ~15 min per pair).
 2. All 13 green → record D.1 results in TODO (per pair, exit, boots, notable proof lines), check D.1, push Stage D.
 3. Owner decision worth raising: NeoForge players who delete `config/` are locked out until it comes back (or 24 h).
    Ignore `neoforge-synced.toml` when it's missing, or keep fail-closed? Today: kept, documented in the threat table.
