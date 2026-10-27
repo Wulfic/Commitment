@@ -1,0 +1,7 @@
+# E.1f, boot 3: the committed world, with the config/ NeoForge wrote again in boot 2 (the moved original is still in
+# tamper-backup/): it opens, so deleting config/ costs a NeoForge player one boot of another world, not the 24 hours.
+# @after puts the original config/ back (the regenerated one goes into a "replaced-" backup entry).
+@after bash scripts/tamper.sh restore config
+@expect Commitment: world is committed and its setup matches
+@reject Commitment: +Config (removed|added|changed):
+@expect Done \(

@@ -1,0 +1,10 @@
+# E.1f, boot 2: the player deleted config/ (moved away here, tamper.sh). The committed world is refused for the missing
+# server-side NeoForge file (D.1 row 08), so they open another, uncommitted world once (--world): NeoForge writes its
+# server-side config again when a world loads. That world is made in a marked dir and removed after this boot.
+@before bash scripts/tamper.sh move-config
+@before bash scripts/other-world.sh create
+@after bash scripts/other-world.sh remove
+@gradle -Pcommitment.world=commitment-e1f-other
+@expect Done \(
+@expect Preparing level "commitment-e1f-other"
+@reject Commitment: setup changed since /commit

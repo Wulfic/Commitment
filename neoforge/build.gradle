@@ -110,6 +110,11 @@ neoForge {
 			server()
 			gameDirectory = new File(runRoot, "server")
 			programArguments.addAll '--nogui', '--port', project.dev_server_port
+			// `-Pcommitment.world=<name>` (E.1f, scripts/checks/e1f): opens that world instead of server.properties'
+			// level-name, without editing the file (it's part of a committed server's setup).
+			if (providers.gradleProperty('commitment.world').isPresent()) {
+				programArguments.addAll '--world', providers.gradleProperty('commitment.world').get()
+			}
 		}
 		// ./gradlew :neoforge:<node>:runGameTest, as on Fabric: a GameTest server that runs every server GameTest and
 		// exits. Its world is rebuilt by every run (clearGameTestRunDir).

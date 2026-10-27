@@ -1,0 +1,7 @@
+# E.1f, boot 1 (owner, session 10: NeoForge stays fail-closed on a deleted config/; prove the way back). Commits the
+# NeoForge dev world. Run as a chain over one lock:
+#   LOADER=neoforge NODE=<26.1.2|26.2|26.3> bash scripts/commit-smoke.sh scripts/checks/e1f/*.txt
+commit
+@wait Commitment: to Server: Run /commit confirm within 60 s
+commit confirm
+@wait Commitment: to Server: Commitment: world committed \(
