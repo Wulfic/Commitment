@@ -27,8 +27,11 @@ final class Exclusions {
 			"presencefootsteps/",
 			"ambientsounds/");
 
-	/** Files that change without the player touching the setup. Stage E grows this from a real modpack. */
-	static final List<String> IGNORED = List.of();
+	/** Files that change without the player touching the setup. Stage E grows this from real modpacks (TODO E.1). */
+	static final List<String> IGNORED = List.of(
+			// A running mod's process lock, held open while the game runs, so it can't even be read: Controlify's
+			// controlify/profile-1.lock (Fabulously Optimized) failed /commit for every player of the pack.
+			"*.lock");
 
 	/** OS clutter, matched by file name in any folder. */
 	static final Set<String> OS_JUNK = Set.of(".DS_Store", "Thumbs.db", "desktop.ini");

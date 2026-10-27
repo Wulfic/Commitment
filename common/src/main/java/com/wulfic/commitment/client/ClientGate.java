@@ -33,6 +33,8 @@ import net.minecraft.network.chat.Component;
  */
 public final class ClientGate {
 	public static final String LOCKED_LOG = "Commitment: locked screen ({} changes)";
+	/** Each change the locked screen lists, as the dedicated server logs it (ServerGate): what a bug report needs. */
+	public static final String CHANGE_LOG = "Commitment:   {}";
 
 	/** The world the gate just let through: {@code openWorld} re-entered for it goes ahead once. Render thread only. */
 	private static String passing;
@@ -100,6 +102,7 @@ public final class ClientGate {
 			}
 			case WorldGate.Verdict.Locked locked -> {
 				Commitment.LOGGER.info(LOCKED_LOG, locked.changes().size());
+				locked.changes().forEach(change -> Commitment.LOGGER.info(CHANGE_LOG, change));
 				minecraft.setScreenAndShow(LockedScreen.locked(locked.changes(), notices, locked.timer(), onCancel,
 						actions(flows, minecraft, levelId, onCancel, world, locked.record())));
 			}
