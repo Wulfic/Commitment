@@ -1,0 +1,10 @@
+# D.1, tamper chain boot 6. The same row with the guard pack gone too: nothing in the world names the lock, so the
+# mirror is found by the world's seed and folder name; the record is restored and the pack rewritten.
+@before bash scripts/tamper.sh delete-record
+@before bash scripts/tamper.sh delete-pack
+@sh sleep 3
+@expect Commitment: the world's lock record is missing; restoring .*commitment\.dat from the mirror
+@expect Commitment: wrote guard pack .*commitment_guard\.zip
+@expect Commitment: world is committed and its setup matches
+@reject refusing to load
+@reject Commitment guard: Commitment is missing

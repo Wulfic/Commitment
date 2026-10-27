@@ -14,34 +14,8 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
-PACK=datapacks/commitment_guard.zip
-RECORD=data/commitment.dat
-UUID_RE='^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
-
-# lock_of_pack <zip>: prints the lock id of a Commitment guard pack (its marker line and a lock id), or fails.
-lock_of_pack() {
-	local lock id
-	lock=$(unzip -p -- "$1" commitment.lock 2> /dev/null | tr -d '\r') || return 1
-	grep -qx 'marker=CMTGUARD 1' <<< "$lock" || return 1
-	id=$(sed -n 's/^lock=//p' <<< "$lock")
-	[[ $id =~ $UUID_RE ]] || return 1
-	echo "$id"
-}
-
-# lock_of_record <file>: prints the lock id of a Commitment lock record or mirror, or fails. The file is gzip; its
-# content starts with "CMTLOCK", a 4-byte format, then the lock id's 16 bytes (LockCodec).
-lock_of_record() {
-	local head hex
-	head=$({ gzip -dc -- "$1" 2> /dev/null || true; } | head -c 27 | xxd -p | tr -d '\n')
-	[[ ${#head} -eq 54 && ${head:0:14} == 434d544c4f434b ]] || return 1
-	hex=${head:22:32}
-	echo "${hex:0:8}-${hex:8:4}-${hex:12:4}-${hex:16:4}-${hex:20:12}"
-}
-
-# inside <root> <path>: is path a strict descendant of root (both as given, no ".." parts)?
-inside() {
-	[[ -n $1 && -n $2 && $2 == "$1"/* && $2 != *..* ]]
-}
+# PACK, RECORD, lock_of_pack, lock_of_record, inside, mirror_dir.
+source scripts/lock-files.sh
 
 # remove_if_ours <file> <lock id> <pack|record>: removes the file only when it's Commitment's and of that lock.
 remove_if_ours() {
@@ -183,10 +157,10 @@ fi
 export LOADER=${LOADER:-fabric}
 export NODE=${NODE:-26.3}
 RUN=run/$LOADER/$NODE
-LEVEL_NAME=$(sed -n 's/^level-name=//p' "$RUN/server/server.properties" 2> /dev/null | tr -d '\r')
+# No server.properties before a server's first boot (a fresh Quilt server): the pipeline fails, and that's no error.
+LEVEL_NAME=$(sed -n 's/^level-name=//p' "$RUN/server/server.properties" 2> /dev/null | tr -d '\r') || true
 WORLD=$RUN/server/${LEVEL_NAME:-world}
-# The dev runs' mirror dir (MirrorDir.OVERRIDE, set by each loader's build.gradle).
-MIRROR=$RUN/mirror
+MIRROR=$(mirror_dir "$LOADER" "$NODE")
 
 # Never over files this run didn't write: leftovers are for a person to look at, not for this script to replace.
 for leftover in "$WORLD/$PACK" "$WORLD/$PACK.tmp" "$WORLD/$RECORD" "$WORLD/$RECORD.tmp"; do

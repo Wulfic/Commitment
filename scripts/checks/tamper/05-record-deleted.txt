@@ -1,0 +1,8 @@
+# D.1, tamper chain boot 5. Row "Delete the world's lock record, mod present": restored from the mirror, found by the
+# lock id in the guard pack.
+@before bash scripts/tamper.sh delete-record
+@sh sleep 3
+@expect Commitment: the world's lock record is missing; restoring .*commitment\.dat from the mirror
+@expect Commitment: world is committed and its setup matches
+@reject refusing to load
+@reject Commitment guard: Commitment is missing

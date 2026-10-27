@@ -280,3 +280,37 @@ and fails on "Mod commitment uses" / "Mods loaded with N warning". Forge 26.x do
 `Data.DifficultyLocked`.
 **Fix:** `WorldSeed.hardcore` tries the 26.x path, then 1.21.11's. Fixture test on both layouts with the byte flipped.
 **Dead ends:** Byte-searching NBT for a key. Walk the tree and print full paths (a 30-line Python walker does it).
+
+## 2026-10-27 — Quilt meta's installer SHA-1 is stale; trust the maven .sha1 next to the jar
+**Symptom:** `meta.quiltmc.org/v3/versions/installer` lists quilt-installer 0.15.1 with SHA-1 `a6ea7a9e…`; the jar on
+maven.quiltmc.org hashes to `e4c4e80c…`, the same size (8734533), and matches maven's own `.sha1` and `.sha256`.
+**Cause:** Meta's hash list wasn't regenerated when the jar was republished.
+**Fix:** `scripts/server-jars.sh` checks every download against the checksum file published beside it on the same maven.
+**Affects:** scripts/server-jars.sh
+
+## 2026-10-27 — `$(sed … file | tr …)` kills a `set -euo pipefail` script silently when the file doesn't exist yet
+**Symptom:** `commit-smoke.sh` on a fresh Quilt server exited 2 with an empty log.
+**Cause:** No `server.properties` before a server's first boot; `sed` fails, pipefail makes the assignment fail, and
+`set -e` exits with nothing printed (`2> /dev/null` hid sed's message). Every dev run dir already had the file.
+**Fix:** `|| true` on the `LEVEL_NAME=` reads in commit-smoke.sh, dev-server-smoke.sh, tamper.sh.
+**Affects:** scripts/*.sh
+
+## 2026-10-27 — Never edit a bash script that a background job is running
+**Symptom:** risk only, caught in time: `commit-smoke.sh` was edited (shorter) while a background chain ran it.
+**Cause:** bash reads a script as it executes; after a compound command it resumes at a byte offset of the new file.
+**Fix:** reran the pair that was in flight. Wait for background runs before editing the scripts they use.
+
+## 2026-10-27 — Dedicated servers pause when empty after 60 s (`pause-when-empty-seconds=60`)
+**Symptom:** none yet; a smoke boot that runs longer than ~60 s with no player stops ticking: no guard cycles, no
+20-tick settings checks.
+**Fix:** keep each smoke boot's commands under a minute after `Done (`. Not a bypass: with no player, there's no one
+to penalise, and the guard runs again the tick a player joins.
+**Affects:** scripts/checks/*
+
+## 2026-10-27 — A mutation run leaves its effect in the dev world; a chain must set its own baseline
+**Symptom:** the tamper chain's vanilla boot replied "Game rule random_tick_speed is already set to 7".
+**Cause:** C.6's mutation check (the 20-tick hold off) ran `rules-revert.txt` on fabric 26.3: the rule was set to 7
+and nothing put it back, then the cleanup removed the lock. The next `/commit` committed 7.
+**Fix:** `scripts/checks/tamper/01-commit.txt` sets random_tick_speed 3, difficulty easy, default gamemode survival
+before `/commit`. Any check that names a committed value sets it first.
+**Affects:** scripts/checks/tamper/01-commit.txt

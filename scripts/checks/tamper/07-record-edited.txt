@@ -1,0 +1,8 @@
+# D.1, tamper chain boot 7. Row "Hand-edit the lock record": its HMAC fails, so it counts as damaged, and the mirror's
+# valid copy wins and is written back. Editing both copies is boot 13.
+@before bash scripts/tamper.sh edit-record
+@sh sleep 3
+@expect Commitment: the world's lock record is damaged: .*; restoring .*commitment\.dat from the mirror
+@expect Commitment: world is committed and its setup matches
+@reject refusing to load
+@reject Commitment guard: Commitment is missing

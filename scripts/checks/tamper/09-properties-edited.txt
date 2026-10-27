@@ -1,0 +1,10 @@
+# D.1, tamper chain boot 9. Row "Edit server.properties on a committed dedicated server": locked at the next start,
+# the changed key named and its value never logged. @after puts the file back.
+@before bash scripts/tamper.sh edit-property motd commitment-d1-secret-motd
+@after bash scripts/tamper.sh restore properties
+@exits-nonzero
+@allow-error Commitment: setup changed since /commit, refusing to load world
+@expect Commitment: setup changed since /commit, refusing to load world
+@expect server\.properties: motd changed
+@reject commitment-d1-secret-motd
+@reject Done \(

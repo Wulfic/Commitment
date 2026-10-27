@@ -115,7 +115,7 @@ The player owns every file, so this is friction, not security. Each row is a Sta
 | Delete or edit `config/` | Nothing changes: no lock state lives there |
 | Delete the guard datapack, mod present | The mod rebuilds it from the record at the next server start |
 | Delete the world's lock record, mod present | Restored from the mirror (matched by the lock id in the guard pack, or by seed + folder name) |
-| Hand-edit the lock record | HMAC fails, so it's treated as tampered: locked, and the only way out is the 24 h timer |
+| Hand-edit the lock record | HMAC fails, so that copy counts as damaged and the mirror's valid copy is written back. Edit **both** copies: treated as tampered, locked, and the only way out is the 24 h timer |
 | Move the clock forward | Still locked: the timer uses internet time |
 | `/datapack disable` with cheats on (e.g. Open to LAN) | Works only without the mod. With it, the pack is re-enabled at server start |
 | `/tick freeze` with cheats on, mod deleted | The guard pauses, but so does the world (0.2). Same cheats bar as the row above |
@@ -1053,6 +1053,69 @@ NeoForge and Forge first** (step C.0), so Proof 2 runs on all nine loader × nod
 
 - [ ] D.1 Every row of the threat-model table on Fabric, NeoForge and Forge (Quilt with the
       Fabric jar): the action, the expected result, what happened. Record here.
+      **Owner, session 9 (2026-10-27):** build the Quilt real-server harness **now** (Stage F reuses it) and run the
+      server rows on Quilt too; **all ten** dev pairs plus Quilt × 26.1.2/26.2/26.3 (13 pairs); the clock row is proven by
+      JUnit + a source scan (never by moving the machine's clock); the "still works" bypass is proven live on a vanilla
+      server.
+      **Plan (session 9, before code).** Facts so far: Quilt meta (fetched 2026-10-27) lists 26.1.2/26.2/26.3 with
+      Loader **0.31.0-beta.4** (betas only; server profile `KnotServer`, no intermediary), installer 0.15.1. Unknown until
+      a boot: whether it loads 26.x, and which `fabricloader` version it provides against our `>=0.19.5`. `MirrorDir`
+      reads `LOCALAPPDATA` from the environment, so a built-jar server gets its own mirror dir with no code change (the
+      `-Dcommitment.mirrorDir` override is dev-only by design). `LockStore.load`: a hand-edited world record with a
+      valid mirror is **restored from the mirror**; only both copies bad → tampered (the table's row is reworded below).
+      A dedicated server forces `server.properties`' difficulty at every start, so the level.dat row proves our
+      put-back on a **game rule** (save-only) and only the end state for difficulty.
+      0. **Quilt probe first (it can change the design).** `scripts/server-jars.sh`: `vanilla_jar <node> <dest>` (moved
+         out of `vanilla-guard-smoke.sh`, SHA-1 from piston-meta), `quilt_server <node> <dir>` (installer jar SHA-1
+         from Quilt meta, `install server <mc> <loader> --download-server`), `fabric_api <node> <mods dir>` (Fabric API
+         pin from `gradle.properties`/node props, `.sha1` from maven.fabricmc.net). Boot `run/quilt/26.3/server` with the
+         built Fabric jar and `boot.txt` by hand. If Quilt can't load 26.x or the Fabric jar: **stop and report.**
+      1. **`dev-server-smoke.sh` launchers.** `LOADER=quilt` (nodes 26.1.2/26.2/26.3): `run/quilt/<node>/server`, the
+         built `fabric/versions/<node>/build/libs` jar + Fabric API in `mods/`, `LOCALAPPDATA=run/quilt/<node>/appdata`,
+         `@gradle -Pcommitment.unlock=X` mapped to `-Dcommitment.unlock=X`. **`@server vanilla`** in a commands file:
+         Mojang's jar from `run/vanilla/<node>`, launched with `--universe <loader's server dir> --world <level-name>`
+         on the same world, the Commitment boot line `@reject`ed instead of required. Both write
+         `dev-server-smoke: server exited <code>` after java ends, so a refusal doesn't wait out the boot timeout.
+         `commit-smoke.sh` learns Quilt's mirror dir. Self-test cases: the vanilla verdict (boot line required absent),
+         the exit sentinel, the `-P` → `-D` mapping.
+      2. **`scripts/tamper.sh`** (destructive, so guarded): `LOADER=.. NODE=.. tamper.sh <delete-pack|delete-record|
+         edit-record|edit-mirror|move-config|edit-properties|restore>`. Every target resolved and asserted inside
+         `run/<loader>/<node>/`; pack/record/mirror only when they carry Commitment's marker; each change first copies
+         the file to `run/<loader>/<node>/tamper-backup/` and `cmp`s the copy; `restore` puts back what's there and
+         removes the backup only after `cmp`. An edit flips one payload byte past the lock id (the cleanup still finds
+         the id). Refuses an empty LOADER/NODE or an unknown action. `--self-test` on scratch dirs: foreign file
+         untouched, path outside root refused, restore round-trips byte-identical, a failed backup → nothing changed.
+      3. **The chain**, one lock per pair: `commit-smoke.sh` over `scripts/checks/tamper/NN-*.txt` in order:
+         | # | Row | Boot | Proof |
+         |---|---|---|---|
+         | 01 | — | commit + `/unlock confirm` | `world committed`, `unlock available at` (timer left running) |
+         | 02 | Delete Commitment; `/tick freeze` | `@server vanilla` | guard line; `tick freeze` → `warned` cleared and not set again in 6 s; `tick unfreeze` → set again; `difficulty hard`, `gamerule random_tick_speed 7` applied |
+         | 03 | Reinstall; level.dat edited | mod | `put back gamerule/minecraft:random_tick_speed: 7 -> 3`, `The difficulty is Easy`, `commit status` → `unlock available at .* left`, guard silent |
+         | 04 | Delete guard pack | mod, `@before delete-pack` | `wrote guard pack`, pack enabled, guard silent |
+         | 05 | Delete record | mod, `@before delete-record` | `restoring .*commitment.dat from the mirror`, setup matches |
+         | 06 | Delete record **and** pack | mod, both | restored via seed + folder from the mirror, pack rewritten |
+         | 07 | Hand-edit record | mod, `edit-record` | restored from the mirror (record tampered), setup matches |
+         | 08 | Delete/edit `config/` | mod, `move-config` (restored by `@after`) | still committed (outcome per loader pinned after a probe: Fabric's is empty) |
+         | 09 | Edit `server.properties` | mod, `edit-properties motd` | refuses, `server.properties: motd changed`, `@reject` the new value; `@after restore` |
+         | 10–11 | `/datapack disable` | existing `guard-disable` / `guard-reenable` | re-enabled at start |
+         | 12 | `/difficulty`, `/gamerule`, ... | existing `rules-revert` | put back within 1 s |
+         | 13 | Edit record **and** mirror | mod, both edited | `no lock record can be trusted`, refuses, `The lock record was damaged or deleted` |
+         | 14 | Delete mod **and** pack (still works) | `@server vanilla`, `delete-pack` | world opens, no guard line, world audit clean |
+         `scripts/tamper-matrix.sh` runs the chain on the 13 pairs (sequential, background) and writes
+         `build/tamper-matrix.md` (pair × row → exit, matched lines) for this entry.
+      4. **Clock row:** JUnit `UnlockTimerTest`: trusted clock at start + 1 h with the local clock (LockStore's) at
+         +48 h → still pending. `ClockSourcesTest`: scans `common|fabric|neoforge|forge/src/main/java` for
+         `currentTimeMillis|Instant.now|LocalDate(Time)?.now|Clock.system|new Date(` and pins the exact list (today:
+         `CommitmentServer`'s `LockStore` wiring). Mutations: a `System.currentTimeMillis()` in `UnlockTimer` → red.
+      5. Threat table (here and README in F.1): "Hand-edit the lock record" → "the mirror's copy wins; edit **both** →
+         locked, 24 h only".
+      **Not doing:** the client-side rows live (singleplayer level.dat edit, mod deleted on a client): same common code,
+      C.6's client test and Proof 4 cover them; Quilt on 1.21.11 (C.2a: Fabric only); Quilt GameTests; moving the
+      system clock.
+      **Blast radius:** dev run dirs only (`run/<loader>/<node>/`, `run/quilt/`, `run/vanilla/`); every tamper backed up
+      and `cmp`-verified in `tamper-backup/` first; vanilla boots on a Forge/NeoForge dev world may drop loader tags
+      from its `level.dat` (dev worlds, regenerable). Downloads checksummed. **Rollback:** `tamper.sh restore` per pair;
+      `git revert` of the D commits; `rm -r run/quilt` (built from scratch).
 
 ### Stage E: a real modpack (rung 7, on a copy)
 

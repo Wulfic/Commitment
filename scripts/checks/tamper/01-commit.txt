@@ -1,0 +1,19 @@
+# D.1, the tamper chain, boot 1 (scripts/tamper-matrix.sh runs the chain in order): commits the dev world and starts
+# the 24-hour unlock, and leaves it running, so boot 3 can show the timer survived the mod's removal. Needs internet.
+# First the settings the later boots change are set to the dev server's own baseline: a dev world keeps whatever an
+# earlier run (a mutation check, say) left in it, and the chain's "put back X -> Y" lines name these values (boots 3
+# and 12 @expect them, which proves the baseline took).
+gamerule random_tick_speed 3
+difficulty easy
+defaultgamemode survival
+@sh sleep 1
+commit
+@wait Commitment: to Server: Run /commit confirm within 60 s
+commit confirm
+@wait Commitment: to Server: Commitment: world committed \(
+unlock
+@wait Commitment: to Server: Commitment: /unlock confirm starts the 24-hour unlock
+unlock confirm
+@wait Commitment: to Server: Commitment: unlock available at .* \(24h\)
+@expect Commitment: wrote guard pack .*commitment_guard\.zip
+@reject Commitment guard: Commitment is missing

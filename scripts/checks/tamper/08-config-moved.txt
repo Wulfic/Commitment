@@ -1,0 +1,10 @@
+# D.1, tamper chain boot 8. Row "Delete or edit config/": the whole server config/ is moved away. No lock state lives
+# there, so the world is still committed (the loader writes its default config files again, the ones committed).
+# Editing a config file is C.5's locked-config.txt. @after puts config/ back.
+@before bash scripts/tamper.sh move-config
+@after bash scripts/tamper.sh restore config
+@sh sleep 3
+@expect Commitment: world is committed and its setup matches
+@expect Commitment: world world is committed; heartbeat on
+@reject Commitment: world .* isn't committed
+@reject Commitment guard: Commitment is missing

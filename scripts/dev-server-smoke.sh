@@ -4,10 +4,15 @@
 #   scripts/dev-server-smoke.sh                                  # boot + stop: fabric, node 26.3
 #   scripts/dev-server-smoke.sh scripts/checks/boot.txt          # boot, send each command, stop
 #   LOADER=neoforge NODE=26.1.2 scripts/dev-server-smoke.sh ...  # another loader or node
+#   LOADER=quilt NODE=26.3 scripts/dev-server-smoke.sh ...       # the built Fabric jar on a real Quilt server
 #   scripts/dev-server-smoke.sh --self-test                      # check the verdict against synthetic logs
 #
 # Exit codes: 0 proven · 1 the mod is bad · 2 nothing proven (port busy, bad arguments, Gradle failed before the
 # server launched). Exit 2 is never a pass.
+#
+# LOADER=quilt runs outside Gradle: Quilt Loader's server in run/quilt/<node>/server (scripts/server-jars.sh), with
+# the node's built Fabric jar (build it first) and Fabric API in mods/, and LOCALAPPDATA set to run/quilt/<node>/appdata
+# so the lock mirror of a released jar stays in run/ too.
 #
 # Lines in the commands file:
 #   <command>          typed into the server console, after this run's "Done (" line
@@ -20,6 +25,8 @@
 #   @audit-allow <re>  a world path the check's own @sh steps change on purpose (see the world audit below)
 #   @before <shell>    run with bash from the repo root before the server launches (a failure: exit 2, nothing proven)
 #   @after <shell>     run with bash from the repo root once the server has stopped, whatever the verdict (cleanup)
+#   @server vanilla    boot Mojang's own server jar (no loader, no Commitment) on this loader node's world instead:
+#                      Commitment's boot line must be absent. @gradle -Pcommitment.<x>=<y> becomes -Dcommitment.<x>=<y>
 #                      @sh, @before and @after see LOADER and NODE in their environment
 #   @wait <regex>      hold the next command until this run's log has a line matching this (up to WAIT_TIMEOUT s,
 #                      default 90), for a reply that comes later than the command; counts as an @expect too.
@@ -42,14 +49,37 @@ ERROR_LINE='/(ERROR|FATAL)\]'
 # the mod. Without one, Gradle failed before the launch and nothing was proven.
 LAUNCHED_LINE='^\[[0-9:]+\] \[[^]]+/(INFO|WARN|ERROR|FATAL|DEBUG)\]'
 
+# Written after a server launched outside Gradle ends, so the console feed stops waiting for a "Done (" that a refusal
+# never prints (Gradle's own "BUILD ..." line does that for runServer).
+EXITED_LINE='^dev-server-smoke: server exited [0-9]+$'
+
 # launched <output>: did the game's JVM run at all? No means exit 2, whatever Gradle's exit code says.
 launched() {
 	grep -qE -- "$LAUNCHED_LINE" "$1"
 }
 
+# server_ended <output>: has the server process ended (Gradle finished, or a jar launch wrote EXITED_LINE)?
+server_ended() {
+	grep -qE -- "^BUILD (SUCCESSFUL|FAILED)|$EXITED_LINE" "$1" 2> /dev/null
+}
+
+# jvm_props <@gradle arg>...: each -Pcommitment.<x>=<y> as -Dcommitment.<x>=<y>, for a server launched outside Gradle
+# (each loader's build.gradle forwards exactly these). Fails on any other arg: it would be silently dropped.
+jvm_props() {
+	local arg
+	for arg in "$@"; do
+		if [[ $arg =~ ^-P(commitment\.[a-zA-Z.]+=[^[:space:]]+)$ ]]; then
+			echo "-D${BASH_REMATCH[1]}"
+		else
+			echo "dev-server-smoke: @gradle $arg means nothing to a server launched outside Gradle" >&2
+			return 1
+		fi
+	done
+}
+
 # verdict <server output> [commands file]: prints each failure, returns 0 (proven) or 1 (the mod is bad).
 verdict() {
-	local out=$1 commands=${2:-} fail=0 line re errors refusal=no
+	local out=$1 commands=${2:-} fail=0 line re errors refusal=no server=mod
 	local -a allowed=() expected=() rejected=()
 	if [[ -n "$commands" ]]; then
 		while IFS= read -r line || [[ -n "$line" ]]; do
@@ -60,6 +90,7 @@ verdict() {
 				@wait\ *) expected+=("${line#@wait }") ;;
 				@reject\ *) rejected+=("${line#@reject }") ;;
 				@exits-nonzero) refusal=yes ;;
+				@server\ vanilla) server=vanilla ;;
 			esac
 		done < "$commands"
 	fi
@@ -67,7 +98,14 @@ verdict() {
 	if [[ $refusal == no ]]; then
 		grep -q 'Done (' "$out" || { echo "FAIL: the server never finished starting (no 'Done (')"; fail=1; }
 	fi
-	grep -qE -- "$BOOT_LINE" "$out" || { echo "FAIL: no boot line matching: $BOOT_LINE"; fail=1; }
+	if [[ $server == vanilla ]]; then
+		if line=$(grep -m1 -E -- "$BOOT_LINE" "$out"); then
+			echo "FAIL: Commitment loaded on a server meant to be vanilla: $line"
+			fail=1
+		fi
+	else
+		grep -qE -- "$BOOT_LINE" "$out" || { echo "FAIL: no boot line matching: $BOOT_LINE"; fail=1; }
+	fi
 	errors=$(grep -E -- "$ERROR_LINE" "$out" | grep -i 'commitment' || true)
 	for re in ${allowed[@]+"${allowed[@]}"}; do
 		errors=$(grep -vE -- "$re" <<< "$errors" || true)
@@ -189,6 +227,25 @@ self_test() {
 	fi
 	check 1 "a mod-loading crash fails the verdict" "$dir/forge-crash.out"
 
+	# @server vanilla: the same verdict with the boot line's polarity turned round.
+	printf '%s\n' '@server vanilla' > "$dir/vanilla.txt"
+	check 0 "@server vanilla: no boot line passes" "$dir/no-boot.log" "$dir/vanilla.txt"
+	check 1 "@server vanilla: Commitment's boot line fails" "$dir/good.log" "$dir/vanilla.txt"
+	printf '%s\n' '[01:26:21] [main/INFO]: Starting minecraft server version 26.3' "dev-server-smoke: server exited 1" > "$dir/jar-exit.out"
+	if server_ended "$dir/jar-exit.out" && ! server_ended "$dir/good.log"; then
+		echo "ok   a jar launch's exit line ends the wait, a running server's log doesn't"
+	else
+		echo "FAIL a jar launch's exit line ends the wait, a running server's log doesn't"
+		failures=$((failures + 1))
+	fi
+	if [[ $(jvm_props -Pcommitment.unlock=start) == "-Dcommitment.unlock=start" ]] && ! jvm_props --offline 2> /dev/null &&
+		! jvm_props -Pother.flag=1 2> /dev/null; then
+		echo "ok   -Pcommitment.* maps to -D, anything else is refused"
+	else
+		echo "FAIL -Pcommitment.* maps to -D, anything else is refused"
+		failures=$((failures + 1))
+	fi
+
 	exit_check() { # exit_check <expected> <name> <status> <yes|no>
 		local got=0
 		exit_verdict "$3" "$4" > /dev/null || got=$?
@@ -234,7 +291,13 @@ MARKER=build/dev-server-smoke-$LOADER-$NODE.marker
 
 case "$LOADER" in
 	fabric | neoforge | forge) ;;
-	*) echo "LOADER must be fabric, neoforge or forge (Quilt runs the Fabric jar), not '$LOADER'" >&2; exit 2 ;;
+	quilt)
+		if [[ $NODE == 1.21.11 ]]; then
+			echo "no Quilt on 1.21.11: that node is Fabric only" >&2
+			exit 2
+		fi
+		;;
+	*) echo "LOADER must be fabric, quilt, neoforge or forge, not '$LOADER'" >&2; exit 2 ;;
 esac
 # Every branch lists the same nodes in settings.gradle.
 if ! grep -qE "versions .*'$NODE'" settings.gradle; then
@@ -268,13 +331,63 @@ if [[ -n "$COMMANDS_FILE" ]]; then
 			@audit-allow\ *) AUDIT_ALLOW+=("${line#@audit-allow }") ;;
 			@before\ *) BEFORE+=("${line#@before }") ;;
 			@after\ *) AFTER+=("${line#@after }") ;;
+			@server\ vanilla) SERVER=vanilla ;;
+			@server\ *) echo "unknown $line in $COMMANDS_FILE (only @server vanilla)" >&2; exit 2 ;;
 		esac
 	done < "$COMMANDS_FILE"
 fi
+SERVER=${SERVER:-mod}
 
 # The world the server opens: server.properties' level-name, vanilla's "world" until the first boot writes the file.
-LEVEL_NAME=$(sed -n 's/^level-name=//p' "$RUN_DIR/server.properties" 2>/dev/null | tr -d '\r')
+LEVEL_NAME=$(sed -n 's/^level-name=//p' "$RUN_DIR/server.properties" 2>/dev/null | tr -d '\r') || true
 WORLD=$RUN_DIR/${LEVEL_NAME:-world}
+
+# The servers launched outside Gradle: Mojang's jar on this node's world, or the Quilt server with the built jar.
+# Anything missing that can't be fetched and checked is exit 2: nothing was proven.
+source scripts/server-jars.sh
+JAR_DIR=""
+JAR_ARGS=()
+if [[ $SERVER == vanilla || $LOADER == quilt ]]; then
+	JVM_PROPS=()
+	if (( ${#GRADLE_ARGS[@]} > 0 )); then
+		props=$(jvm_props "${GRADLE_ARGS[@]}") || exit 2
+		mapfile -t JVM_PROPS <<< "$props"
+	fi
+fi
+if [[ $SERVER == vanilla ]]; then
+	if [[ ! -f $WORLD/level.dat ]]; then
+		echo "dev-server-smoke: no world at $WORLD for the vanilla server to open" >&2
+		exit 2
+	fi
+	JAR_DIR=run/vanilla/$NODE
+	vanilla_jar "$NODE" "$JAR_DIR/server.jar" || { echo "dev-server-smoke: NOTHING PROVEN (exit 2): no checked vanilla jar" >&2; exit 2; }
+	# The loader's server dir as the universe: the very world the mod boots open, not a copy.
+	JAR_ARGS=(${JVM_PROPS[@]+"${JVM_PROPS[@]}"} -jar server.jar --port "$PORT" --universe "$PWD/$RUN_DIR" --world "${LEVEL_NAME:-world}" nogui)
+elif [[ $LOADER == quilt ]]; then
+	JAR_DIR=$RUN_DIR
+	BUILT=$(compgen -G "fabric/versions/$NODE/build/libs/commitment-*+fabric-mc*.jar" | grep -v -- '-sources\.jar$' || true)
+	if [[ $(wc -w <<< "$BUILT") -ne 1 ]]; then
+		echo "dev-server-smoke: need exactly one built Fabric jar in fabric/versions/$NODE/build/libs (found: ${BUILT:-none}); run ./gradlew :fabric:$NODE:build" >&2
+		exit 2
+	fi
+	quilt_server "$NODE" "$RUN_DIR" || { echo "dev-server-smoke: NOTHING PROVEN (exit 2): no Quilt server" >&2; exit 2; }
+	fabric_api "$NODE" "$RUN_DIR/mods" || { echo "dev-server-smoke: NOTHING PROVEN (exit 2): no checked Fabric API" >&2; exit 2; }
+	for old in "$RUN_DIR"/mods/commitment-*.jar; do
+		if [[ -e $old && $(basename "$old") != "$(basename "$BUILT")" ]]; then
+			rm -- "$old"
+			echo "dev-server-smoke: removed the older $old" >&2
+		fi
+	done
+	cp -- "$BUILT" "$RUN_DIR/mods/"
+	[[ -f $RUN_DIR/eula.txt ]] || echo "eula=true" > "$RUN_DIR/eula.txt"
+	mkdir -p "run/quilt/$NODE/appdata"
+	JAR_ARGS=(-Xmx3G ${JVM_PROPS[@]+"${JVM_PROPS[@]}"} -jar quilt-server-launch.jar --port "$PORT" nogui)
+fi
+if [[ -n $JAR_DIR ]]; then
+	LOG=$JAR_DIR/logs/latest.log
+	mkdir -p "$JAR_DIR"
+	[[ -f $JAR_DIR/eula.txt ]] || echo "eula=true" > "$JAR_DIR/eula.txt"
+fi
 AUDIT_BEFORE=build/world-audit-$LOADER-$NODE.before
 AUDIT_AFTER=build/world-audit-$LOADER-$NODE.after
 
@@ -320,8 +433,8 @@ wait_for_line() {
 feed_console() {
 	local waited=0 cmd
 	until [[ -f "$LOG" && "$LOG" -nt "$MARKER" ]] && grep -q 'Done (' "$LOG"; do
-		# Gradle finished: the server died before "Done (", and nobody reads stdin any more.
-		if grep -qE '^BUILD (SUCCESSFUL|FAILED)' "$OUT" 2>/dev/null; then
+		# The server died before "Done (", and nobody reads stdin any more.
+		if server_ended "$OUT"; then
 			echo "dev-server-smoke: the server exited before 'Done ('" >&2
 			return
 		fi
@@ -338,7 +451,7 @@ feed_console() {
 			cmd=${cmd%$'\r'}
 			[[ -z "$cmd" || "$cmd" == \#* || "$cmd" == @expect\ * || "$cmd" == @reject\ * || "$cmd" == @allow-error\ * ||
 				"$cmd" == @exits-nonzero || "$cmd" == @gradle\ * || "$cmd" == @audit-allow\ * || "$cmd" == @before\ * ||
-				"$cmd" == @after\ * ]] && continue
+				"$cmd" == @after\ * || "$cmd" == @server\ * ]] && continue
 			if [[ "$cmd" == @wait\ * ]]; then
 				wait_for_line "${cmd#@wait }"
 				continue
@@ -356,11 +469,28 @@ feed_console() {
 	echo stop
 }
 
-echo "dev-server-smoke: :$LOADER:$NODE:runServer on port $PORT, output in $OUT"
 set +e
-feed_console | timeout $((BOOT_TIMEOUT + 180)) ./gradlew ":$LOADER:$NODE:runServer" --console=plain ${GRADLE_ARGS[@]+"${GRADLE_ARGS[@]}"} \
-	> "$OUT" 2>&1
-status=$?
+if [[ -n $JAR_DIR ]]; then
+	echo "dev-server-smoke: java ${JAR_ARGS[*]} in $JAR_DIR ($SERVER server, $LOADER $NODE world) on port $PORT, output in $OUT"
+	# A released jar's lock mirror (MirrorDir reads LOCALAPPDATA) lands in run/quilt/<node>/appdata, never in yours.
+	# Mojang's server never reads it.
+	APPDATA_DIR=${LOCALAPPDATA:-}
+	if [[ $LOADER == quilt && $SERVER == mod ]]; then
+		APPDATA_DIR=$(cygpath -w "$PWD/run/quilt/$NODE/appdata" 2> /dev/null || echo "$PWD/run/quilt/$NODE/appdata")
+	fi
+	feed_console | {
+		(cd "$JAR_DIR" && LOCALAPPDATA=$APPDATA_DIR timeout $((BOOT_TIMEOUT + 180)) java "${JAR_ARGS[@]}")
+		code=$?
+		echo "dev-server-smoke: server exited $code"
+		exit $code
+	} > "$OUT" 2>&1
+	status=$?
+else
+	echo "dev-server-smoke: :$LOADER:$NODE:runServer on port $PORT, output in $OUT"
+	feed_console | timeout $((BOOT_TIMEOUT + 180)) ./gradlew ":$LOADER:$NODE:runServer" --console=plain ${GRADLE_ARGS[@]+"${GRADLE_ARGS[@]}"} \
+		> "$OUT" 2>&1
+	status=$?
+fi
 set -e
 # Cleanup first, so no verdict below can skip it.
 after_status=0

@@ -1,0 +1,11 @@
+# D.1, tamper chain boot 14. Row "Still works": the mod and the guard pack both gone. Mojang's server opens the world,
+# no guard runs, and nothing else of the world is touched (the world audit). @after puts the pack back so the chain's
+# cleanup finds this lock's files.
+@server vanilla
+@before bash scripts/tamper.sh delete-pack
+@after bash scripts/tamper.sh restore pack
+@sh sleep 6
+datapack list enabled
+@expect There are [0-9]+ data pack\(s\) enabled
+@reject commitment_guard\.zip \(world\)
+@reject Commitment guard: Commitment is missing

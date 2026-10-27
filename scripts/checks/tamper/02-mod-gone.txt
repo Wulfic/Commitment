@@ -1,0 +1,25 @@
+# D.1, tamper chain boot 2. Rows "Delete or disable Commitment" and "/tick freeze, mod deleted", and the first half of
+# "edit level.dat with the mod removed": Mojang's own server (no loader, no Commitment) opens the committed world.
+# The guard finds no heartbeat and fires. Frozen, it stops: its "warned" flag, cleared by hand, isn't set again for 6 s
+# (three guard cycles). Unfrozen, it fires again within 4 s. Then the world's game settings are changed with nothing
+# there to put them back.
+@server vanilla
+@wait Commitment guard: Commitment is missing
+tick freeze
+@wait The game is frozen
+data remove storage commitment:guard warned
+@wait Modified storage commitment:guard
+@sh sleep 6
+data get storage commitment:guard
+@wait Storage commitment:guard has the following contents: \{\}
+tick unfreeze
+@wait The game is running
+@sh sleep 4
+data get storage commitment:guard
+@wait Storage commitment:guard has the following contents: \{warned: 1b\}
+gamerule random_tick_speed 7
+@wait random_tick_speed is now set to:? 7
+difficulty hard
+@wait The difficulty has been set to Hard
+datapack list enabled
+@expect There are [0-9]+ data pack\(s\) enabled: .*file/commitment_guard\.zip

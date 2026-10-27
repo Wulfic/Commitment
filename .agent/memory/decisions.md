@@ -404,3 +404,22 @@ everywhere (fights an op's admin work and a cheats-on world's own commands). Eve
 flip a host whose gamemode differed at commit). Messaging only ops, or only "the player who changed it" (unknowable
 from a periodic check).
 **Affects:** TODO C.6, common WorldSettings, CommitmentServer, the snapshot at `/commit confirm`
+
+## 2026-10-27 — Stage D: the tamper matrix as one chain per pair, Quilt built now, the clock by JUnit
+**Context:** D.1 runs every threat-model row on every loader. Quilt has no dev-server path: only the built Fabric jar
+on a real Quilt server tests it. Proving "move the clock forward" live would mean moving the owner's system clock.
+**Choice:** Owner (session 9): the Quilt real-server harness is built in Stage D (F reuses it) and the server rows run
+on Quilt × 26.1.2/26.2/26.3 as well as the ten dev pairs. The clock row is a JUnit (local clock +48 h, trusted clock
++1 h → still pending) plus a source scan that pins every local-clock read in shipped code. The "still works" bypass
+is proven live on a vanilla server. Rows run as one ordered chain of boots per pair over one lock
+(`commit-smoke.sh scripts/checks/tamper/*`), with the "edit both copies" row last because it leaves the world
+locked for good. `dev-server-smoke.sh` gets `@server vanilla` (Mojang's jar on the same world via `--universe`) and
+`LOADER=quilt`; the built-jar server gets its own `LOCALAPPDATA` so the mirror stays in `run/`.
+**Why:** One commit per pair instead of one per row roughly halves the boots (~14 per pair, not ~26). A shared launcher keeps one
+verdict, one world audit and one cleanup for every kind of server. `LOCALAPPDATA` is what `MirrorDir` already reads,
+so production code needs no test seam.
+**Rejected:** Leaving Quilt to Stage F (owner chose now). Moving the clock, or a dev-only clock-offset property (a
+seam in shipped code for something the source scan proves structurally). A separate vanilla-runner script per row
+(a second verdict to keep in step). Honouring `-Dcommitment.mirrorDir` on a released jar (decisions.md: one flag
+would hide every mirror).
+**Affects:** TODO D.1, scripts/dev-server-smoke.sh, commit-smoke.sh, server-jars.sh, tamper.sh, tamper-matrix.sh

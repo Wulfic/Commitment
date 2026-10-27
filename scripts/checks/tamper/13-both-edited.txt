@@ -1,0 +1,11 @@
+# D.1, tamper chain boot 13 (after guard-disable, guard-reenable and rules-revert). Row "Hand-edit the lock record"
+# with the mirror edited too: no copy can be trusted, so the world stays locked for good and only the 24-hour unlock
+# opens it. The last boot with the mod: this lock is spent after it.
+@before bash scripts/tamper.sh edit-record
+@before bash scripts/tamper.sh edit-mirror
+@exits-nonzero
+@allow-error Commitment: setup changed since /commit, refusing to load world
+@expect Commitment: no lock record can be trusted
+@expect Commitment: setup changed since /commit, refusing to load world
+@expect Commitment:   The lock record was damaged or deleted
+@reject Done \(

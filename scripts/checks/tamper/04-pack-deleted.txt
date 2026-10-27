@@ -1,0 +1,10 @@
+# D.1, tamper chain boot 4. Row "Delete the guard datapack, mod present": rebuilt from the record at the next start,
+# enabled, and silent. (tamper.sh keeps the deleted pack in run/<loader>/<node>/tamper-backup.)
+@before bash scripts/tamper.sh delete-pack
+@sh sleep 5
+datapack list enabled
+@expect Commitment: wrote guard pack .*commitment_guard\.zip
+@expect Commitment: world world is committed; heartbeat on
+@expect There are [0-9]+ data pack\(s\) enabled: .*file/commitment_guard\.zip
+@reject Commitment guard: Commitment is missing
+@reject refusing to load

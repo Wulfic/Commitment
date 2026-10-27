@@ -1,0 +1,15 @@
+# D.1, tamper chain boot 3, the mod back after boot 2. Rows "Reinstall Commitment" (the lock and the running timer are
+# back) and "edit level.dat with the mod removed" (the game rule vanilla saved is put back at open). Difficulty: a
+# dedicated server forces server.properties' value at every start anyway, so only the end state is checked.
+@sh sleep 3
+commit status
+@wait Commitment: to Server: Commitment: unlock available at .* left\)
+difficulty
+@wait The difficulty is Easy
+gamerule random_tick_speed
+@wait random_tick_speed is currently set to:? 3
+@expect Commitment: world is committed and its setup matches
+@expect Commitment: world world is committed; heartbeat on
+@expect Commitment: put back gamerule/minecraft:random_tick_speed: 7 -> 3
+@reject Commitment guard: Commitment is missing
+@reject Commitment: can't put back
