@@ -1142,6 +1142,66 @@ NeoForge and Forge first** (step C.0), so Proof 2 runs on all nine loader × nod
       instance's mods, config and resource packs copied into `run/packs/1.21.11/`, offline dev account), scripted
       restarts; mods that won't run in a dev environment get reported. The 26.x nodes use a **premade Modrinth vanilla+
       pack** per node and loader where one exists, a small handmade one where none does (decisions.md 2026-10-22).
+      **Owner, session 10 (decisions.md 2026-10-27):** every pack runs as a real dev client, game windows allowed;
+      the 1.21.11 copy is the Prism instance as it is today; **no Quilt in Stage E** (Fabric runs the same jar; Quilt's
+      proof is F.2's built-jar boot); NeoForge stays fail-closed on a deleted `config/`, and E.1f proves the way back.
+
+      **Plan (session 10).** Goal: on 10 pack × node pairs, one commit then four reopens of the same world, each
+      reopen logs `is committed and its setup matches` and no `locked screen`; the fourth reopen comes after video,
+      audio and shader settings changed. Every file that tripped a reopen is in `Exclusions` with a test.
+      **Approach:** vanilla Quick Play opens the world (C.4's `-Pcommitment.quickPlay`, proven on NeoForge and Forge);
+      a dev-only **pack driver** in each loader's GameTest mod types `/commit` and `/commit confirm` and quits the
+      game through `Minecraft#stop` (a clean exit, so mods write their configs on the way out, as for a player).
+      Rejected: Fabric's client GameTest as the driver (Fabric only, and it sets up its own client environment, which
+      is the thing under test); a test seam in shipped code; ending the JVM by PID (no clean exit: the configs mods
+      write at shutdown never get written); a guard-pack function running `/commit` (functions run at level 2, and
+      `/commit` needs the host or level 4).
+      **Packs** (most-downloaded with a version for exactly that loader and node, Modrinth API, 2026-10-27):
+
+      | Node | Fabric | NeoForge | Forge |
+      |---|---|---|---|
+      | 1.21.11 | the owner's Prism `1.21.11` copy (82 mods, Fabric Loader 0.19.5) | — | — |
+      | 26.1.2 | Fabulously Optimized 13.6.0 (`glnu8pns`) | Optimized fps 4.2.0 (`bQ00Yjon`) | Fastly Optimised a-26.1.2 (`yKMJtVS7`, 1.7 KB: check it holds mods; handmade top-up if not) |
+      | 26.2 | Fabulously Optimized 14.1.1 (`uQxD0ENB`) | Optimized fps 4.3.0 (`kdmJOWvh`) | Fastly Optimised b-26.2 (`UGnfzt2p`) |
+      | 26.3 | Fabulously Optimized 15.0.0-beta.2 (`Wo44jriL`) | Optimized fps 4.4.0 (`UTCVjkus`) | Fastly Optimised b-26.3 (`yATWpNhp`) |
+
+      - [ ] E.1a Pack driver + `packClient` run. `fabric/src/gametest/.../PackDriver.java` (loader-free: Minecraft
+            client classes only), wired by a client tick hook per loader (Fabric `ClientTickEvents`, NeoForge and
+            Forge in their GameTest mods). Inert unless `-Dcommitment.packDriver=commit|reopen`. In a world for 100
+            ticks → `commit`: `/commit`, 40 ticks, `/commit confirm`, 100 ticks, stop; `reopen`: 200 ticks, stop. Logs
+            `Commitment pack driver: <phase> done, stopping`, and the open screen's class every 20 s when not in a
+            world (so a mod's first-launch screen holding Quick Play shows in the log). A run per loader:
+            `:<loader>:<node>:runPackClient -Pcommitment.packDir=<dir>` (game dir `<dir>/game`, mirror `<dir>/mirror`,
+            loads commitment + the GameTest mod). The Fabric hook class stays out of NeoForge/Forge's swapped copy.
+      - [ ] E.1b Pack install. `scripts/pack-fetch.py <version id> <dir>` (stdlib only, `python -I`): the mrpack and
+            each client file checked against Modrinth's sha512, overrides + client-overrides unpacked, into
+            `run/packs/<node>/<loader>-<slug>/game`; refuses a dir that exists. Leaves out the jars the dev run
+            already has (Fabric API, the loader), and writes `pack.txt` (version id, every file and hash, what was left
+            out and why). `scripts/pack-copy-instance.sh`: **read-only** copy of the Prism instance's `mods/` (minus
+            Fabric API), `config/`, `defaultconfigs/`, `resourcepacks/`, `shaderpacks/`, `options.txt` into
+            `run/packs/1.21.11/fabric-prism/game`, then a hash compare source vs copy. Never writes under Prism.
+      - [ ] E.1c `scripts/pack-smoke.sh` (`LOADER NODE PACK=<dir>`): copies the node's dev world into
+            `<pack>/game/saves/commitment-pack-smoke` (marker file), sets `onboardAccessibility:false`, launches commit +
+            3 reopens, then edits video/audio keys of `options.txt` (render distance, gamma, master volume), the
+            pack's Sodium options and Iris shader choice where present, and reopens a 4th time. Per launch: world
+            audit before/after, the expected lines, any `locked screen:` diff lines printed. Graceful stop by the
+            driver; on a timeout, the one game JVM it started (by command line, never by name) gets `CloseMainWindow`,
+            then exit 2. Exit 0 proven · 1 a diff or a Commitment error · 2 nothing proven. Cleanup (on 0 only): the
+            marked world copy and this lock's mirror. `--self-test`: the cleanup's guards on scratch dirs.
+      - [ ] E.1d Run every pair (background, one at a time). Each diff line → `Exclusions.IGNORED` (changes by itself)
+            or `NEVER_LOCKED` (video/audio/shader), a case per entry in `ExclusionsTest`, rerun until exit 0. A file
+            that changes and is real setup (a gameplay config rewritten at boot) is a design question, stop and ask.
+      - [ ] E.1e Every run recorded here (pair, command, exit, matched lines, launch times for E.2).
+      - [ ] E.1f NeoForge's way back: a dev-server check: committed world, `config/` moved away, boot an **uncommitted**
+            world once (`--world`), then the committed world opens. If the uncommitted boot doesn't write the file,
+            the threat table says so instead.
+      **Not doing:** Quilt; NeoForge/Forge on 1.21.11; multiplayer; any mod's account features (Essential, offline dev
+      account); fixing other mods that won't run in a dev environment (reported here, pack run without them only if
+      they're leaf mods, noted per pair); the owner's saves (dev world copies only).
+      **Blast radius:** Prism instance read only (`cp` from it, hash-checked; nothing writes there). Everything else
+      lands in `run/packs/` (git-ignored, rebuilt from the downloads and the copy) and the dev world copies. Every
+      Exclusions entry loosens the lock: each one names the mod and why, and has a test. **Rollback:** `rm -r
+      run/packs/<node>/<pair>` (rebuilt by E.1b); `git revert` of the E commits.
 - [ ] E.2 Time the scan on that pack. If it adds more than 2 s to world open, optimize, and
       measure before and after.
 

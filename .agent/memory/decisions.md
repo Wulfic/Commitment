@@ -423,3 +423,28 @@ seam in shipped code for something the source scan proves structurally). A separ
 (a second verdict to keep in step). Honouring `-Dcommitment.mirrorDir` on a released jar (decisions.md: one flag
 would hide every mirror).
 **Affects:** TODO D.1, scripts/dev-server-smoke.sh, commit-smoke.sh, server-jars.sh, tamper.sh, tamper-matrix.sh
+
+## 2026-10-27 — NeoForge stays fail-closed on a deleted config/; Stage E packs run as real clients
+**Context:** D.1 row 08: NeoForge writes its server-side config (`neoforge-server.toml`, `neoforge-synced.toml` on
+26.3) only after Commitment's check, so a committed world is refused when `config/` is deleted. Separately, E.1 had to
+pick between dev clients and dedicated servers for the packs.
+**Choice:** Owner (session 10): keep fail-closed, no special case for NeoForge's own file. Prove the way back (opening
+an uncommitted world writes the file again) with a test. Every Stage E pack (the 1.21.11 copy and each 26.x pack) runs
+as a scripted dev client, game windows allowed. The 1.21.11 copy is taken from the Prism instance as it is today.
+**Why:** Deleting `config/` is a setup change, and the way back is one world open. Client packs only show their
+client-side config rewrites (and the resource-pack and `options.txt` scan) in a real client.
+**Rejected:** Ignoring NeoForge's server-side file when it's missing (a hole only NeoForge would have). Dedicated
+servers for the 26.x packs (client-only mods' rewrites go untested). Asking before each batch of client launches.
+**Affects:** TODO E.1, the threat table, scripts for Stage E
+
+## 2026-10-27 — Stage E: no Quilt; packs driven by Quick Play plus a dev-only pack driver
+**Context:** Quilt has no dev client in this tree. The packs need `/commit` typed and the game quit with no one at the
+keyboard, on Fabric, NeoForge and Forge.
+**Choice:** Owner: skip Quilt in Stage E (Fabric runs the same jar; F.2 boots it). Quick Play opens a copy of the dev
+world; a dev-only driver in each loader's GameTest mod sends the commands and quits through `Minecraft#stop`. Packs
+are the most-downloaded per node and loader with a version for exactly that pair (TODO E.1 table).
+**Why:** Quick Play is already proven on NeoForge and Forge (C.4). A clean quit lets mods write shutdown configs,
+which is the rewrite E.1 hunts for.
+**Rejected:** Fabric's client GameTest (Fabric only, sets up its own client). A seam in shipped code. Ending the JVM
+by PID (no clean exit). A datapack function running `/commit` (level 2; `/commit` needs the host or level 4).
+**Affects:** TODO E.1, fabric|neoforge|forge gametest source sets and build.gradle, scripts/pack-*.
