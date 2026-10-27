@@ -4,20 +4,22 @@
 > cheap to read at the start of every session. History belongs in `decisions.md` and
 > `gotchas.md`; this file only answers "where am I right now?".
 
-**Last updated:** 2026-10-27 (session 9 end: Stage D / D.1 done and pushed)
+**Last updated:** 2026-10-27 (session 10, mid E.1: pipeline built, first pack runs)
 **Branch:** `main`, always (decisions.md 2026-10-21). Push each green stage (owner, 2026-10-21).
 
 ## Where we are
 **Commitment**: locks a world's setup after `/commit`, with a 24-hour unlock. Plan in `TODO.md` (Tier 2).
-- Stages 0, A, B, C, D done and pushed. 13 nodes; common 290 JUnit per node.
-- D.1: the tamper chain (14 boots) exit 0 on all 13 pairs (fabric x4, neoforge x3, forge x3, quilt x3). NeoForge
-  refuses row 08 (config/ moved): its server-side config (`neoforge-server.toml`, `neoforge-synced.toml` on 26.3) is
-  written after our check; pinned in `08-config-moved-neoforge.txt`, threat table reworded (gotchas 2026-10-27).
+- Stages 0, A, B, C, D done and pushed. Stage E in progress: plan in TODO E.1 (committed 9d5ff70).
+- Owner, session 10: NeoForge stays fail-closed on a deleted `config/` (E.1f proves the way back); packs run as real
+  dev clients; Prism 1.21.11 copied as it is today; **no Quilt in Stage E** (decisions.md 2026-10-27).
+- Built, uncommitted until green: PackDriver (+ hooks per loader), `runPackClient` per loader, `pack-fetch.py`,
+  `pack-copy-instance.sh`, `pack-smoke.sh`, ClientGate logging each locked change, `Exclusions.IGNORED` `*.lock`.
+- Installed: all 9 Modrinth packs under `run/packs/<node>/<loader>-<slug>/` and the Prism copy at
+  `run/packs/1.21.11/fabric-prism/` (409 files verified).
 
 ## Next
-1. Stage E (TODO E.1): a real modpack, on a copy, 3 restarts → zero diffs.
-2. Owner decision worth raising: NeoForge players who delete `config/` are locked out until it comes back (or 24 h).
-   Ignore NeoForge's server-side config when it's missing, or keep fail-closed? Today: kept, in the threat table.
+1. Finish E.1d pair by pair (fabric 26.3 first), recording each run in TODO E.1e. Then commit + push E.1a-c.
+2. E.1f (NeoForge way back), E.2 (scan time: `/commit` preview ~2 s on 148 mods already).
 - Untested: SettingsLock/CommitmentServer catch blocks around the tick check (TODO C.6).
 - Stale bookkeeping: C.1 checkbox unticked though done; C.2b bullet 3 waits on E.1.
 
@@ -32,6 +34,8 @@
 - Commit flow: `LOADER=.. NODE=.. bash scripts/commit-smoke.sh` (4 boots on one world, cleans up by marker + lock id).
 - Client locked screen (NeoForge/Forge): `LOADER=.. NODE=.. bash scripts/client-locked-smoke.sh` (opens a game window).
 - Guard without the mod: `NODE=.. bash scripts/vanilla-guard-smoke.sh` (Mojang server jar into run/vanilla/<node>).
+- Pack run: `LOADER=.. NODE=.. PACK=run/packs/<node>/<pack> bash scripts/pack-smoke.sh` (5 client launches; `--clean`
+  removes a failed run's copy). Packs: `python -I scripts/pack-fetch.py <version id> <dir>`.
 - Tamper matrix: `bash scripts/tamper-matrix.sh [loader:node ...]` → `build/tamper-matrix.md`; Quilt needs the built
   Fabric jar. `tamper.sh` backups live in `run/<loader>/<node>/tamper-backup/` (never auto-deleted).
 

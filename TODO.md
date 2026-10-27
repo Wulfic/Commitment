@@ -1192,6 +1192,20 @@ NeoForge and Forge first** (step C.0), so Proof 2 runs on all nine loader × nod
             or `NEVER_LOCKED` (video/audio/shader), a case per entry in `ExclusionsTest`, rerun until exit 0. A file
             that changes and is real setup (a gameplay config rewritten at boot) is a design question, stop and ask.
       - [ ] E.1e Every run recorded here (pair, command, exit, matched lines, launch times for E.2).
+      **Runs (session 10).** Fabric 26.3 / Fabulously Optimized 15.0.0-beta.2 (148 mods, 3 resource packs, 107 config
+      files): run 1 exit 1, `/commit` failed reading `config/controlify/profile-1.lock` (held locked by Controlify while
+      the game runs) → `*.lock` in `Exclusions.IGNORED` (ExclusionsTest 23 → 29 per common node; mutation red). Run 2
+      exit 1: the driver's confirm came before the ~2 s preview ended ("nothing to confirm") → confirm retried until
+      the record exists. Run 3 exit 0 but the mirror landed in `run/fabric/26.3/mirror` (Loom `inherit client`) →
+      `client()`, and pack-smoke now checks the mirror's path (red on run 3's log). **Run 4
+      (`LOADER=fabric NODE=26.3 PACK=run/packs/26.3/fabric-fabulously-optimized bash scripts/pack-smoke.sh`): exit 0**,
+      commit + 4 reopens each `commitment-pack-smoke is committed and its setup matches`, the 4th after renderDistance,
+      gamma, master volume, maxFps, `iris.properties` enableShaders and a Sodium option changed; world audit clean on all
+      5; launches 95–135 s. Full build after: green, common 296 ×4, fabric 12 ×4, GameTests 6 on all 10 pairs (Forge was
+      red until the dist-cleaner fix, gotchas 2026-10-27). ClientGate's change line proven on a real client:
+      `client-locked-smoke.sh` neoforge 26.3 exit 0, `Commitment:   The lock record was damaged or deleted, ...`.
+      Installed (pack.txt each): all 9 Modrinth packs above; the dev pins are a patch or more newer than each pack asks
+      for. Prism copy: `bash scripts/pack-copy-instance.sh` exit 0, 81 mods + 305 config files, 409 files hash-verified.
       - [ ] E.1f NeoForge's way back: a dev-server check: committed world, `config/` moved away, boot an **uncommitted**
             world once (`--world`), then the committed world opens. If the uncommitted boot doesn't write the file,
             the threat table says so instead.

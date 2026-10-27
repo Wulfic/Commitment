@@ -320,3 +320,54 @@ before `/commit`. Any check that names a committed value sets it first.
 **Finding:** at startup NeoForge writes `fml.toml` and `neoforge-local.toml` again before the world opens, but its server-side file only later: `neoforge-server.toml` on 26.1.2/26.2, renamed `neoforge-synced.toml` on 26.3 (loaded with the world). So Commitment's check sees the committed file missing, logs `Config removed: config/neoforge-synced.toml` and refuses. That's fail closed, not a bypass: putting `config/` back (or the 24 h unlock) opens it. A NeoForge player who deletes `config/` is locked out of the committed world until the file comes back. Opening any uncommitted world once should write it again with defaults (not proven).
 **Rule:** a "the loader regenerates it" assumption is per loader and per config type: probe it on every loader. The matrix runs `scripts/checks/tamper/08-config-moved-neoforge.txt` for NeoForge pairs.
 **Affects:** scripts/tamper-matrix.sh, scripts/checks/tamper/08-config-moved*.txt, TODO.md threat table
+
+## 2026-10-27 — Controlify holds config/controlify/profile-1.lock open: /commit failed on Fabulously Optimized
+**Symptom:** E.1's first pack run (Fabulously Optimized 15.0.0-beta.2, Fabric 26.3): `/commit` logged ERROR `can't read
+config/controlify/profile-1.lock: The process cannot access the file because another process has locked a portion of
+the file`. Every player of that pack could never commit.
+**Cause:** Controlify keeps a Windows byte-range lock on its profile lock file while the game runs; the scanner reads
+every file under `config/`.
+**Fix:** `Exclusions.IGNORED` gets `*.lock` (a process lock holds no setup), with ExclusionsTest cases both ways.
+**Rule:** a file the running game holds open can fail the scan at `/commit` and at world open alike. Only a real pack
+in a real client shows it; JUnit's temp dirs never will.
+**Affects:** common/.../manifest/Exclusions.java
+
+## 2026-10-27 — /commit's preview takes seconds on a big pack; a confirm before it ends gets "nothing to confirm"
+**Symptom:** the pack driver sent `/commit confirm` 2 s after `/commit`: "nothing to confirm; run /commit first", then
+the preview reply arrived.
+**Cause:** `/commit` scans the whole setup off-thread (148 mods, ~2 s) before it records the pending confirm.
+**Fix:** PackDriver confirms every 10 s until `data/commitment.dat` exists (6 tries). A player who types fast just
+retries; the message already says what to do.
+**Affects:** fabric/src/gametest/.../PackDriver.java
+
+## 2026-10-27 — Windows refuses renaming a just-written dir of jars for a few seconds
+**Symptom:** `pack-fetch.py`'s final `rename(<dir>.partial, <dir>)`: WinError 5, Access is denied.
+**Cause:** a scanner (Defender) still holds the fresh jars; it lets go after ~6 s.
+**Fix:** retry once a second, 30 s at most (`pack-fetch.py rename`, `pack-copy-instance.sh`).
+**Affects:** scripts/pack-fetch.py, scripts/pack-copy-instance.sh
+
+## 2026-10-27 — Build-script ordering for a pack client run, per loader
+**Facts:** Loom: `sourceSets.gametest` exists only after `fabricApi { configureTests {} }`, so a run naming it goes
+below that block (a `loom.runs` block of its own; `configureEach` above still applies). ForgeGradle 7 takes a run's type
+from its name (`client`, `server`, `gameTestServer`), and already makes `run<Name>` per run, so a run named
+`packClient` is untyped and `runPackClient` clashes. The Forge pack client is the `client` run itself, pointed at the
+pack by `-Pcommitment.packDir`, launched on the gametest classpath (`runGametestClient`, aliased `runPackClient`).
+**Affects:** fabric|neoforge|forge/build.gradle
+
+## 2026-10-27 — Loom's `inherit client` carries the client run's -D properties, and the JVM kept them
+**Symptom:** the first passing pack run wrote its lock mirror into `run/fabric/26.3/mirror` (the dev server's, where
+the smokes refuse leftovers), not `<pack>/mirror`, though `configureEach` named the pack's dir for `packClient`.
+**Cause:** `inherit client` copies the client run's `-Dcommitment.mirrorDir`; the pack's value didn't win.
+**Fix:** `client()` instead of `inherit client`; `pack-smoke.sh` now fails a commit whose "wrote lock mirror" line
+isn't in the pack's mirror dir (checked against the bad run's log first: it fails there).
+**Rule:** a smoke that cleans up a file must also check the file was written where the cleanup looks.
+**Affects:** fabric/build.gradle, scripts/pack-smoke.sh
+
+## 2026-10-27 — Forge's dist cleaner kills a GameTest server that so much as loads a class naming client types
+**Symptom:** after adding the pack driver hook, every Forge `runGameTest` failed at mod construction: `Attempted to load
+class net/minecraft/client/server/IntegratedServer for invalid dist DEDICATED_SERVER` (NeoForge's passed).
+**Cause:** `PackDriver.active()` loaded PackDriver; verifying it loaded `IntegratedServer` (`getSingleplayerServer()`
+assigned to `MinecraftServer`).
+**Fix:** the GameTest mods test `System.getProperty(PackDriver.PROPERTY)`: a compile-time constant, so PackDriver is
+never loaded outside a pack run. The full build's Forge GameTests are the proof (red before, green after).
+**Affects:** forge|neoforge/src/gametest/.../*GameTests.java
