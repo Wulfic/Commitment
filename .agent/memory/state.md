@@ -4,7 +4,7 @@
 > cheap to read at the start of every session. History belongs in `decisions.md` and
 > `gotchas.md`; this file only answers "where am I right now?".
 
-**Last updated:** 2026-10-26 (session 8: C.3c-C.6 committed; push Stage C next)
+**Last updated:** 2026-10-26 (session 8: Stage C done and pushed, 8e4e61f; Stage D next)
 **Branch:** `main`, always (decisions.md 2026-10-21). Push each green stage (owner, 2026-10-21).
 
 ## Where we are
@@ -16,7 +16,7 @@
 - Owner rulings in decisions.md, incl. session 7: E.1 runs the 1.21.11 copy as a Loom dev client, 26.x on premade
   Modrinth packs.
 
-## Next: push Stage C (C.0-C.6 committed), then Stage D (tamper matrix)
+## Next: Stage D (tamper matrix); Stage C pushed to origin/main at 8e4e61f
 - C.6 done (TODO.md): settings snapshot at `/commit confirm`, held every 20 ticks + at start, hardcore at open.
   Session 8 rulings in decisions.md 2026-10-26 (LAN guests locked; player gamemode held on cheats-off integrated).
 - D.1 has the row "edit difficulty/game rules in level.dat with the mod removed, reinstall -> put back at open".
