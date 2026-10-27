@@ -23,7 +23,7 @@ REASON_LINE='Commitment: no lock record can be trusted'
 # The LockedScreen (C.4) built its body and its buttons, labelled from the lang file (a raw key means it didn't load).
 SHOWN_LINE='Commitment: locked screen shows [1-9][0-9]* lines; buttons: Back, Start 24-hour unlock'
 # Each change the screen lists is in the log too (ClientGate.CHANGE_LOG), so a player's log shows why they're locked.
-CHANGE_LINE=']:? Commitment:   [^ ]'
+CHANGE_LINE='[])]:? Commitment:   [^ ]'
 
 # remove_copy <saves dir> <copy dir>: removes the world copy only when it's exactly <saves>/commitment-locked-smoke
 # and holds the marker this script wrote into it. Fails, removing nothing, otherwise.

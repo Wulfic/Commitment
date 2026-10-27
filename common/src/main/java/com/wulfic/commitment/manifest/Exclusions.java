@@ -11,8 +11,8 @@ import java.util.stream.Stream;
  */
 final class Exclusions {
 	/**
-	 * Video, shader and audio settings stay free (owner, 2026-10-21). Names read from each mod's newest 26.3 jar
-	 * (plan step 0.4).
+	 * Video, shader and audio settings stay free (owner, 2026-10-21), and so does the language, as options.txt's
+	 * {@code lang} does. Names read from each mod's newest 26.3 jar (plan step 0.4) and from Stage E's packs.
 	 * Shader packs live in {@code shaderpacks/}, which the scanner never reads.
 	 */
 	static final List<String> NEVER_LOCKED = List.of(
@@ -25,13 +25,18 @@ final class Exclusions {
 			"dynamic_fps*",
 			"sound_physics_remastered/",
 			"presencefootsteps/",
-			"ambientsounds/");
+			"ambientsounds/",
+			// Language Reload's language choice; it also rewrites the file at startup (Fabulously Optimized 26.1.2).
+			"languagereload.json");
 
 	/** Files that change without the player touching the setup. Stage E grows this from real modpacks (TODO E.1). */
 	static final List<String> IGNORED = List.of(
 			// A running mod's process lock, held open while the game runs, so it can't even be read: Controlify's
 			// controlify/profile-1.lock (Fabulously Optimized) failed /commit for every player of the pack.
-			"*.lock");
+			"*.lock",
+			// Crash Assistant's own UI text: it prunes the pack's overrides when the first game quits (Fabulously
+			// Optimized 26.1.2: 70 keys shipped, 50 kept), so a world committed in a pack's first session locked itself.
+			"crash_assistant/crash_assistant_localization_overrides/");
 
 	/** OS clutter, matched by file name in any folder. */
 	static final Set<String> OS_JUNK = Set.of(".DS_Store", "Thumbs.db", "desktop.ini");

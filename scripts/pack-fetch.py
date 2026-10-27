@@ -2,6 +2,7 @@
 
     python -I scripts/pack-fetch.py <version id> <dir under run/packs/>
     python -I scripts/pack-fetch.py swap <pack dir> <mods/old.jar> <version id>   # update one mod, as a player would
+    python -I scripts/pack-fetch.py drop <pack dir> <mods/leaf.jar> <why>                # a leaf mod the dev loader refuses
     python -I scripts/pack-fetch.py --self-test
 
 Downloads the .mrpack and every file the client needs, each checked against the sha512 Modrinth publishes, and
@@ -174,6 +175,25 @@ def swap(pack, old_rel, version_id):
     print(f"pack-fetch: swapped {old_rel} for {primary['filename']} ({version['version_number']}); old jar kept in {kept}")
 
 
+def drop(pack, old_rel, why):
+    """Takes one leaf mod out of an installed pack (one that won't load on the dev loader, and nothing depends on). The
+    jar moves to <pack>/swapped/, never deleted; pack.txt records it and why."""
+    if not why.strip():
+        raise PackError("a drop needs a reason; pack.txt records it")
+    game = pack / "game"
+    old = inside(game, old_rel)
+    if not old.is_file() or not old_rel.startswith("mods/") or not old_rel.endswith(".jar"):
+        raise PackError(f"{old_rel} isn't a jar in {game / 'mods'}")
+    kept = pack / "swapped" / old.name
+    kept.parent.mkdir(exist_ok=True)
+    if kept.exists():
+        raise PackError(f"{kept} exists already")
+    old.rename(kept)
+    with open(pack / "pack.txt", "a", encoding="utf-8") as txt:
+        txt.write(f"dropped  {old_rel} ({why}); the jar is in swapped/\n")
+    print(f"pack-fetch: dropped {old_rel}; kept in {kept}")
+
+
 def checked_pack(arg):
     pack = (REPO / arg).resolve() if not Path(arg).is_absolute() else Path(arg).resolve()
     packs = (REPO / "run" / "packs").resolve()
@@ -232,6 +252,13 @@ def self_test():
         expect(refused(lambda: swap(pack, "config.txt", "x")), "a swap of a file outside mods/ is refused")
         expect(refused(lambda: swap(pack, "mods/../config.txt", "x")), "a swap with '..' is refused")
         expect(refused(lambda: swap(pack, "mods/missing.jar", "x")), "a swap of a missing jar is refused")
+        (pack / "game" / "mods" / "leaf.jar").write_bytes(b"jar")
+        expect(refused(lambda: drop(pack, "mods/leaf.jar", " ")), "a drop with no reason is refused")
+        expect(refused(lambda: drop(pack, "config.txt", "why")), "a drop of a file outside mods/ is refused")
+        (pack / "pack.txt").write_text("")
+        drop(pack, "mods/leaf.jar", "test")
+        expect((pack / "swapped" / "leaf.jar").is_file() and not (pack / "game" / "mods" / "leaf.jar").exists(),
+               "a drop keeps the jar in swapped/")
     expect(refused(lambda: checked_dest("run/elsewhere/x")), "a dir outside run/packs is refused")
     expect(refused(lambda: checked_dest("run/packs/../x")), "a dir that resolves outside run/packs is refused")
     expect(refused(lambda: checked_dest("run/packs")), "run/packs itself is refused")
@@ -242,10 +269,10 @@ def self_test():
 def main(argv):
     if argv == ["--self-test"]:
         return self_test()
-    if len(argv) == 4 and argv[0] == "swap":
+    if len(argv) == 4 and argv[0] in ("swap", "drop"):
         try:
             pack = checked_pack(argv[1])
-            swap(pack, argv[2], argv[3])
+            (swap if argv[0] == "swap" else drop)(pack, argv[2], argv[3])
         except ValueError as e:
             print(f"pack-fetch: {e}", file=sys.stderr)
             return 2

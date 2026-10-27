@@ -282,7 +282,7 @@ launch() {
 	fi
 	if grep -qE -- 'Commitment: locked screen \(' "$tag.log"; then
 		echo "FAIL: launch $n ($phase) was locked. What the LockedScreen listed:"
-		grep -E -- 'Commitment: locked screen|]:? Commitment:   ' "$tag.log" | sed 's/^/    /' | head -60
+		grep -E -- 'Commitment: locked screen|[])]:? Commitment:   ' "$tag.log" | sed 's/^/    /' | head -60
 		verdict=1
 	elif [[ $phase == commit ]]; then
 		for re in 'Commitment: world committed \(' "Commitment pack driver: commit phase over \(commit done\)"; do
