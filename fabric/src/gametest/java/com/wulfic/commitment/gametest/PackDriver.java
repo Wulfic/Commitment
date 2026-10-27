@@ -4,9 +4,11 @@ import com.wulfic.commitment.Commitment;
 import com.wulfic.commitment.client.LockedScreen;
 import com.wulfic.commitment.lock.LockStore;
 import com.wulfic.commitment.server.CommitmentServer;
+import java.lang.reflect.Field;
 import java.nio.file.Files;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.AccessibilityOnboardingScreen;
+import net.minecraft.client.gui.screens.BackupConfirmScreen;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.server.MinecraftServer;
 
@@ -40,6 +42,8 @@ public final class PackDriver {
 	private static int outOfWorld;
 	private static int locked;
 	private static int committedAt;
+	private static boolean proceeded;
+	private static boolean onboarded;
 	private static boolean stopping;
 
 	private PackDriver() {
@@ -71,9 +75,20 @@ public final class PackDriver {
 			Screen screen = screen(minecraft);
 			// A fresh game dir shows vanilla's accessibility onboarding first and holds Quick Play behind it. Continue is
 			// what a player presses; it records the onboarding as done in options.txt, as it would for them.
-			if (screen instanceof AccessibilityOnboardingScreen) {
+			// Once: the screen stays up a few ticks after Continue, and every press queues Quick Play again.
+			if (screen instanceof AccessibilityOnboardingScreen && !onboarded) {
+				onboarded = true;
 				Commitment.LOGGER.info("Commitment pack driver: pressing Continue on the accessibility onboarding");
 				screen.onClose();
+				return;
+			}
+			// Forge asks once whether to open a world its mods make "experimental" and records the answer in level.dat;
+			// a player of such a pack (Fastly Optimised on Forge 26.3) proceeds on that first open. Only on the commit
+			// launch: the same prompt on a later launch is a finding, and stays up until the run reports it as stuck.
+			if (screen instanceof BackupConfirmScreen backup && PHASE.equals("commit") && !proceeded) {
+				proceeded = true;
+				Commitment.LOGGER.info("Commitment pack driver: proceeding without a backup on the first open's prompt");
+				proceed(backup);
 				return;
 			}
 			if (screen instanceof LockedScreen) {
@@ -130,7 +145,18 @@ public final class PackDriver {
 		minecraft.stop();
 	}
 
-	private static Screen screen(Minecraft minecraft) {
+	/** The prompt's "open without a backup" answer: its own listener, with no backup and no cache erase. */
+	private static void proceed(BackupConfirmScreen screen) {
+		try {
+			Field field = BackupConfirmScreen.class.getDeclaredField("onProceed");
+			field.setAccessible(true);
+			((BackupConfirmScreen.Listener) field.get(screen)).proceed(false, false);
+		} catch (ReflectiveOperationException e) {
+			throw new IllegalStateException("BackupConfirmScreen changed: " + e, e);
+		}
+	}
+
+	public static Screen screen(Minecraft minecraft) {
 		//? if >=26.2 {
 		/*return minecraft.gui.screen();
 		*///?} else {

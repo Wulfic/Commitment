@@ -1,6 +1,7 @@
 """Stage E (TODO E.1b): install a Modrinth modpack version for a dev pack client, checked file by file.
 
     python -I scripts/pack-fetch.py <version id> <dir under run/packs/>
+    python -I scripts/pack-fetch.py swap <pack dir> <mods/old.jar> <version id>   # update one mod, as a player would
     python -I scripts/pack-fetch.py --self-test
 
 Downloads the .mrpack and every file the client needs, each checked against the sha512 Modrinth publishes, and
@@ -148,6 +149,39 @@ def rename(partial, dest):
             time.sleep(1)
 
 
+def swap(pack, old_rel, version_id):
+    """Replaces one jar of an installed pack with a Modrinth version's primary file (sha512-checked), the way a player
+    updates one mod. The old jar moves to <pack>/swapped/, never deleted; pack.txt records both."""
+    game = pack / "game"
+    old = inside(game, old_rel)
+    if not old.is_file() or not old_rel.startswith("mods/") or not old_rel.endswith(".jar"):
+        raise PackError(f"{old_rel} isn't a jar in {game / 'mods'}")
+    version = json.loads(get(f"{API}/version/{urllib.parse.quote(version_id)}"))
+    primary = next((f for f in version["files"] if f["primary"]), version["files"][0])
+    data = checked(get(primary["url"]), primary["hashes"]["sha512"], primary["filename"])
+    new = inside(game, "mods/" + primary["filename"])
+    if new.exists():
+        raise PackError(f"{new} exists already")
+    kept = pack / "swapped" / old.name
+    kept.parent.mkdir(exist_ok=True)
+    if kept.exists():
+        raise PackError(f"{kept} exists already; a swap of this jar was done before")
+    new.write_bytes(data)
+    old.rename(kept)
+    with open(pack / "pack.txt", "a", encoding="utf-8") as txt:
+        txt.write(f"swapped  {old_rel} -> mods/{primary['filename']} (version {version_id}, {version['version_number']})"
+                  f"  {primary['hashes']['sha512'][:16]}; the old jar is in swapped/\n")
+    print(f"pack-fetch: swapped {old_rel} for {primary['filename']} ({version['version_number']}); old jar kept in {kept}")
+
+
+def checked_pack(arg):
+    pack = (REPO / arg).resolve() if not Path(arg).is_absolute() else Path(arg).resolve()
+    packs = (REPO / "run" / "packs").resolve()
+    if packs not in pack.parents or not (pack / "pack.txt").is_file():
+        raise ValueError(f"{pack} isn't an installed pack under {packs}")
+    return pack
+
+
 def checked_dest(arg):
     dest = (REPO / arg).resolve() if not Path(arg).is_absolute() else Path(arg).resolve()
     packs = (REPO / "run" / "packs").resolve()
@@ -189,6 +223,15 @@ def self_test():
         with zipfile.ZipFile(jar, "w") as z:
             z.writestr("fabric.mod.json", '{"id": "fabric-api", "version": "1"}')
         expect(mod_ids(jar.getvalue()) == {"fabric-api"}, "a Fabric jar's id is read")
+    expect(refused(lambda: checked_pack("run/fabric")), "a swap outside run/packs is refused")
+    expect(refused(lambda: checked_pack("run/packs")), "a swap in a dir that isn't an installed pack is refused")
+    with tempfile.TemporaryDirectory() as tmp:
+        pack = Path(tmp)
+        (pack / "game" / "mods").mkdir(parents=True)
+        (pack / "game" / "config.txt").write_text("x")
+        expect(refused(lambda: swap(pack, "config.txt", "x")), "a swap of a file outside mods/ is refused")
+        expect(refused(lambda: swap(pack, "mods/../config.txt", "x")), "a swap with '..' is refused")
+        expect(refused(lambda: swap(pack, "mods/missing.jar", "x")), "a swap of a missing jar is refused")
     expect(refused(lambda: checked_dest("run/elsewhere/x")), "a dir outside run/packs is refused")
     expect(refused(lambda: checked_dest("run/packs/../x")), "a dir that resolves outside run/packs is refused")
     expect(refused(lambda: checked_dest("run/packs")), "run/packs itself is refused")
@@ -199,6 +242,20 @@ def self_test():
 def main(argv):
     if argv == ["--self-test"]:
         return self_test()
+    if len(argv) == 4 and argv[0] == "swap":
+        try:
+            pack = checked_pack(argv[1])
+            swap(pack, argv[2], argv[3])
+        except ValueError as e:
+            print(f"pack-fetch: {e}", file=sys.stderr)
+            return 2
+        except PackError as e:
+            print(f"pack-fetch: FAIL: {e}. Nothing swapped", file=sys.stderr)
+            return 1
+        except OSError as e:
+            print(f"pack-fetch: NOTHING DONE (exit 2): {e}", file=sys.stderr)
+            return 2
+        return 0
     if len(argv) != 2:
         print(__doc__, file=sys.stderr)
         return 2

@@ -274,6 +274,8 @@ launch() {
 			(( verdict == 0 )) && verdict=2
 		fi
 	done
+	# Loader and vanilla prompts the driver answered as a player would: part of the run's record.
+	grep -E -- 'Commitment pack driver: (pressing|proceeding)' "$tag.log" | sed 's/^/note: /' || true
 	if line=$(grep -m1 -E -- "Commitment pack driver: .* phase over \(stuck" "$tag.log"); then
 		echo "pack-smoke: NOTHING PROVEN: $line"
 		(( verdict == 0 )) && verdict=2
@@ -297,7 +299,7 @@ launch() {
 			echo "matched the lock mirror in $MIRROR: $line"
 		else
 			echo "FAIL: the lock mirror wasn't written into $MIRROR_WIN: $(grep -m1 -F 'wrote lock mirror' "$tag.log" || echo 'no mirror line')"
-			verdict=1
+			(( verdict == 0 )) && verdict=1
 		fi
 	else
 		for re in "Commitment: $COPY_NAME is committed and its setup matches" "Commitment pack driver: reopen phase over \(reopen done\)"; do

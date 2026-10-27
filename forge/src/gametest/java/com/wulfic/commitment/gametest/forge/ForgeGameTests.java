@@ -56,6 +56,9 @@ public final class ForgeGameTests {
 		// so a GameTest server never loads PackDriver, whose client types the dist cleaner refuses on a dedicated server.
 		if (System.getProperty(PackDriver.PROPERTY) != null) {
 			TickEvent.ClientTickEvent.Post.BUS.addListener(event -> PackDriver.tick(Minecraft.getInstance()));
+			// Never the GameTests in a pack run: ForgeGradle enables them on the gametest classpath, and their test-instance
+			// datapack makes vanilla call the world experimental (a backup prompt at every open, and a pack in the world).
+			return;
 		}
 		if (!ForgeGameTestHooks.isGametestEnabled()) {
 			return;

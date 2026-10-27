@@ -39,7 +39,10 @@ public final class NeoForgeGameTests {
 		// Stage E's pack runs (scripts/pack-smoke.sh) only. The property, not PackDriver.active(): PROPERTY is a constant,
 		// so a GameTest server never loads PackDriver, whose client types the dist cleaner refuses on a dedicated server.
 		if (System.getProperty(PackDriver.PROPERTY) != null) {
-			NeoForge.EVENT_BUS.addListener(ClientTickEvent.Post.class, event -> PackDriver.tick(Minecraft.getInstance()));
+			NeoForge.EVENT_BUS.addListener(ClientTickEvent.Post.class, event -> NeoForgePackScreens.tick(Minecraft.getInstance()));
+			// Never the GameTests in a pack run, as on Forge (ForgeGameTests): their datapack makes the world experimental.
+			tests = List.of();
+			return;
 		}
 		if (!GameTestHooks.isGametestEnabled()) {
 			tests = List.of();
