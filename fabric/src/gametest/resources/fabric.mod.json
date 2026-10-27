@@ -10,6 +10,9 @@
 			"com.wulfic.commitment.gametest.GuardGameTest",
 			"com.wulfic.commitment.gametest.CommandsGameTest"
 		],
+		"client": [
+			"com.wulfic.commitment.gametest.fabric.PackDriverFabric"
+		],
 		"fabric-client-gametest": [
 			"com.wulfic.commitment.gametest.CommitmentClientGameTest",
 			"com.wulfic.commitment.gametest.WorldGateClientGameTest"

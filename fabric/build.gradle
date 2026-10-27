@@ -44,6 +44,12 @@ configurations {
 // One run root per loader and band, so a newer Minecraft never upgrades another node's worlds, and the client's
 // saves never mix with the dev server's world. runDir is relative to the node's project dir.
 def runRoot = rootProject.file("run/fabric/${band}")
+// Stage E (TODO E.1a): a pack's run dir, always under run/packs/ (fail closed: anything else is refused).
+def PACK_DRIVER = 'commitment.packDriver'
+def packDir = providers.gradleProperty('commitment.packDir').map { rootProject.file(it).canonicalFile }.getOrNull()
+if (packDir != null && !packDir.path.startsWith(rootProject.file('run/packs').canonicalPath + File.separator)) {
+	throw new GradleException("commitment.packDir must be under run/packs/, not ${packDir}")
+}
 
 loom {
 	mods {
@@ -60,9 +66,9 @@ loom {
 			programArgs '--port', project.dev_server_port
 		}
 		// Every run, the GameTest ones included: development writes its lock mirrors here, never into the
-		// developer's own user data dir (MirrorDir.OVERRIDE).
+		// developer's own user data dir (MirrorDir.OVERRIDE). A pack's go beside its game dir.
 		configureEach {
-			property 'commitment.mirrorDir', new File(runRoot, "mirror").absolutePath
+			property 'commitment.mirrorDir', (name == 'packClient' ? new File(packDir, "mirror") : new File(runRoot, "mirror")).absolutePath
 			// `-Pcommitment.unlock=start` (dev-server-smoke.sh's @gradle): the dedicated server's unlock flag (ServerGate).
 			if (providers.gradleProperty('commitment.unlock').isPresent()) {
 				property 'commitment.unlock', providers.gradleProperty('commitment.unlock').get()
@@ -97,6 +103,23 @@ fabricApi {
 		enableGameTests = true
 		enableClientGameTests = true
 		eula = true // Accepts the Minecraft EULA for the automated test server only.
+	}
+}
+
+// Stage E's pack client (scripts/pack-smoke.sh): `-Pcommitment.packDir=<dir>` plays the pack in <dir>/game, with the
+// GameTest mod's PackDriver (`-Pcommitment.packDriver=commit|reopen`) and Quick Play into the world it names. After
+// configureTests, which makes the gametest source set; its mirror dir comes from loom.runs' configureEach, above.
+if (packDir != null) {
+	loom.runs {
+		packClient {
+			// client(), not `inherit client`: inheriting copies the client run's mirror dir, and the JVM kept that one.
+			client()
+			configName = "Pack Client"
+			source sourceSets.gametest
+			runDir project.relativePath(new File(packDir, "game"))
+			property PACK_DRIVER, providers.gradleProperty(PACK_DRIVER).getOrElse('reopen')
+			programArgs '--quickPlaySingleplayer', providers.gradleProperty('commitment.quickPlay').getOrElse('commitment-pack-smoke')
+		}
 	}
 }
 

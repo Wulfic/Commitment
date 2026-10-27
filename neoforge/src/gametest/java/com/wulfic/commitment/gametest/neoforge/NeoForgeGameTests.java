@@ -3,9 +3,11 @@ package com.wulfic.commitment.gametest.neoforge;
 import com.wulfic.commitment.gametest.GameTest;
 import com.wulfic.commitment.gametest.GameTestDiscovery;
 import com.wulfic.commitment.gametest.GameTestDiscovery.TestMethod;
+import com.wulfic.commitment.gametest.PackDriver;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import net.minecraft.client.Minecraft;
 import net.minecraft.core.Holder;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.gametest.framework.FunctionGameTestInstance;
@@ -15,6 +17,8 @@ import net.minecraft.resources.Identifier;
 import net.minecraft.resources.ResourceKey;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.common.Mod;
+import net.neoforged.neoforge.client.event.ClientTickEvent;
+import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.event.RegisterGameTestsEvent;
 import net.neoforged.neoforge.gametest.GameTestHooks;
 import net.neoforged.neoforge.registries.RegisterEvent;
@@ -32,6 +36,11 @@ public final class NeoForgeGameTests {
 	private final List<TestMethod> tests;
 
 	public NeoForgeGameTests(IEventBus modBus) {
+		// Stage E's pack runs (scripts/pack-smoke.sh) only. The property, not PackDriver.active(): PROPERTY is a constant,
+		// so a GameTest server never loads PackDriver, whose client types the dist cleaner refuses on a dedicated server.
+		if (System.getProperty(PackDriver.PROPERTY) != null) {
+			NeoForge.EVENT_BUS.addListener(ClientTickEvent.Post.class, event -> PackDriver.tick(Minecraft.getInstance()));
+		}
 		if (!GameTestHooks.isGametestEnabled()) {
 			tests = List.of();
 			return;

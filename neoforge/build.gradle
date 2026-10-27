@@ -49,6 +49,8 @@ configurations {
 def swapGameTestImports = tasks.register('swapGameTestImports', Sync) {
 	from configurations.serverGameTestJava
 	exclude '**/*ClientGameTest.java'
+	// Fabric's own hooks (PackDriverFabric): Fabric API classes.
+	exclude '**/gametest/fabric/**'
 	into layout.buildDirectory.dir('generated/serverGameTests')
 	// An input, so a changed swap reruns the copy: Gradle can't see inside the filter closure.
 	def swap = ['import net.fabricmc.fabric.api.gametest.v1.GameTest;': 'import com.wulfic.commitment.gametest.GameTest;']
@@ -64,6 +66,12 @@ sourceSets.gametest.resources.srcDir(rootProject.file('fabric/src/gametest/resou
 
 // One run root per loader and band (see fabric/build.gradle).
 def runRoot = rootProject.file("run/neoforge/${band}")
+// Stage E (TODO E.1a): a pack's run dir, always under run/packs/ (fail closed: anything else is refused).
+def PACK_DRIVER = 'commitment.packDriver'
+def packDir = providers.gradleProperty('commitment.packDir').map { rootProject.file(it).canonicalFile }.getOrNull()
+if (packDir != null && !packDir.path.startsWith(rootProject.file('run/packs').canonicalPath + File.separator)) {
+	throw new GradleException("commitment.packDir must be under run/packs/, not ${packDir}")
+}
 
 neoForge {
 	version = project.property("neoforge_version.$band")
@@ -86,6 +94,18 @@ neoForge {
 				programArguments.addAll '--quickPlaySingleplayer', providers.gradleProperty('commitment.quickPlay').get()
 			}
 		}
+		// Stage E's pack client (scripts/pack-smoke.sh): `-Pcommitment.packDir=<dir>` plays the pack in <dir>/game, with
+		// the GameTest mod's PackDriver (`-Pcommitment.packDriver=commit|reopen`) and Quick Play into the world it names.
+		if (packDir != null) {
+			packClient {
+				client()
+				gameDirectory = new File(packDir, "game")
+				sourceSet = sourceSets.gametest
+				loadedMods = [mods.commitment, mods.commitment_gametest]
+				systemProperty PACK_DRIVER, providers.gradleProperty(PACK_DRIVER).getOrElse('reopen')
+				programArguments.addAll '--quickPlaySingleplayer', providers.gradleProperty('commitment.quickPlay').getOrElse('commitment-pack-smoke')
+			}
+		}
 		server {
 			server()
 			gameDirectory = new File(runRoot, "server")
@@ -100,13 +120,13 @@ neoForge {
 			loadedMods = [mods.commitment, mods.commitment_gametest]
 		}
 		configureEach {
-			if (name != 'gameTest') {
+			if (name != 'gameTest' && name != 'packClient') {
 				loadedMods = [mods.commitment]
 			}
 			// Development writes its lock mirrors here, never into the developer's own user data dir (MirrorDir.OVERRIDE).
 			// The GameTest server's go in its own run dir, cleared by every run (clearGameTestRunDir).
 			systemProperty 'commitment.mirrorDir', (name == 'gameTest' ? layout.buildDirectory.dir('run/gameTest/mirror').get().asFile
-					: new File(runRoot, "mirror")).absolutePath
+					: name == 'packClient' ? new File(packDir, "mirror") : new File(runRoot, "mirror")).absolutePath
 			// `-Pcommitment.unlock=start` (dev-server-smoke.sh's @gradle): the dedicated server's unlock flag (ServerGate).
 			if (providers.gradleProperty('commitment.unlock').isPresent()) {
 				systemProperty 'commitment.unlock', providers.gradleProperty('commitment.unlock').get()

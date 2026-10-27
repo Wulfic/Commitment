@@ -22,7 +22,7 @@ import org.junit.jupiter.api.Test;
  * The server GameTests in {@code fabric/src/gametest} also run on NeoForge and Forge, which compile them with the
  * {@code GameTest} import swapped (plan step C.0). So they may name no other loader API, and every class with tests has
  * to be in the {@code fabric-gametest} list, which every loader's runner reads. Fabric skips an unlisted class
- * without a word.
+ * without a word. The {@code gametest.fabric} package and client GameTests are Fabric's alone, never copied.
  */
 class GameTestSourcesTest {
 	private static final String SWAPPED_IMPORT = "import net.fabricmc.fabric.api.gametest.v1.GameTest;";
@@ -64,7 +64,10 @@ class GameTestSourcesTest {
 	private static List<Path> serverSources() throws IOException {
 		try (Stream<Path> files = Files.walk(gametestJava())) {
 			List<Path> sources = files.filter(p -> p.toString().endsWith(".java"))
-					.filter(p -> !p.getFileName().toString().endsWith("ClientGameTest.java")).sorted().toList();
+					.filter(p -> !p.getFileName().toString().endsWith("ClientGameTest.java"))
+					// Fabric's own hooks (PackDriverFabric), which neoforge|forge/build.gradle's swapGameTestImports leave out.
+					.filter(p -> !gametestJava().relativize(p).toString().replace('\\', '/').contains("/gametest/fabric/"))
+					.sorted().toList();
 			assertFalse(sources.isEmpty(), "no server GameTest sources under " + gametestJava());
 			return sources;
 		}

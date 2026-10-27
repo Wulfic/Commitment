@@ -5,6 +5,7 @@ import com.mojang.serialization.JsonOps;
 import com.wulfic.commitment.gametest.GameTest;
 import com.wulfic.commitment.gametest.GameTestDiscovery;
 import com.wulfic.commitment.gametest.GameTestDiscovery.TestMethod;
+import com.wulfic.commitment.gametest.PackDriver;
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
@@ -14,6 +15,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.stream.Stream;
+import net.minecraft.client.Minecraft;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
@@ -29,6 +31,7 @@ import net.minecraft.server.packs.resources.IoSupplier;
 import net.minecraft.world.flag.FeatureFlagSet;
 import net.minecraft.world.level.block.Rotation;
 import net.minecraftforge.event.AddPackFindersEvent;
+import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
 import net.minecraftforge.gametest.ForgeGameTestHooks;
@@ -49,6 +52,11 @@ public final class ForgeGameTests {
 	private static final String PACK_ID = GameTestDiscovery.MOD_ID + ":test_instances";
 
 	public ForgeGameTests(FMLJavaModLoadingContext context) {
+		// Stage E's pack runs (scripts/pack-smoke.sh) only. The property, not PackDriver.active(): PROPERTY is a constant,
+		// so a GameTest server never loads PackDriver, whose client types the dist cleaner refuses on a dedicated server.
+		if (System.getProperty(PackDriver.PROPERTY) != null) {
+			TickEvent.ClientTickEvent.Post.BUS.addListener(event -> PackDriver.tick(Minecraft.getInstance()));
+		}
 		if (!ForgeGameTestHooks.isGametestEnabled()) {
 			return;
 		}
