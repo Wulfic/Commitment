@@ -1051,7 +1051,7 @@ NeoForge and Forge first** (step C.0), so Proof 2 runs on all nine loader × nod
 
 ### Stage D: tamper matrix (disposable world copies only)
 
-- [ ] D.1 Every row of the threat-model table on Fabric, NeoForge and Forge (Quilt with the
+- [x] D.1 Every row of the threat-model table on Fabric, NeoForge and Forge (Quilt with the
       Fabric jar): the action, the expected result, what happened. Record here.
       **Owner, session 9 (2026-10-27):** build the Quilt real-server harness **now** (Stage F reuses it) and run the
       server rows on Quilt too; **all ten** dev pairs plus Quilt × 26.1.2/26.2/26.3 (13 pairs); the clock row is proven by
@@ -1121,7 +1121,10 @@ NeoForge and Forge first** (step C.0), so Proof 2 runs on all nine loader × nod
       26.1.2/26.2/26.3 exit 1, 7/14, at row 08 (`Config removed: config/neoforge-synced.toml`, see the row above), so
       rows 09–14 are unproven on NeoForge. Run 2 (NeoForge pairs only, with `08-config-moved-neoforge.txt`): started at
       session 9's end: 26.1.2 exit 1 at row 08 because its file is `neoforge-server.toml` (the check expected only 26.3's
-      `neoforge-synced.toml`; widened to both). 26.2 and 26.3 ran with the fixed check; 26.1.2 needs a rerun.
+      `neoforge-synced.toml`; widened to both, 25c4363); 26.2 and 26.3 exit 0, 14/14 with the fixed check. Run 3
+      (`bash scripts/tamper-matrix.sh neoforge:26.1.2`, 25c4363): exit 0, 14/14, `Config removed: config/neoforge-server.toml`.
+      **All 13 pairs exit 0, 14/14 boots, world audit clean on every boot.** Clock row: `ClockSourcesTest` + `UnlockTimerTest`
+      green on all 4 common nodes (290 each), mutation red.
 
 ### Stage E: a real modpack (rung 7, on a copy)
 
