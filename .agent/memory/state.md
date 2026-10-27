@@ -4,22 +4,24 @@
 > cheap to read at the start of every session. History belongs in `decisions.md` and
 > `gotchas.md`; this file only answers "where am I right now?".
 
-**Last updated:** 2026-10-27 (session 10, mid E.1: pipeline built, first pack runs)
+**Last updated:** 2026-10-27 (session 10, E.1: 26.3 green on all three loaders)
 **Branch:** `main`, always (decisions.md 2026-10-21). Push each green stage (owner, 2026-10-21).
 
 ## Where we are
 **Commitment**: locks a world's setup after `/commit`, with a 24-hour unlock. Plan in `TODO.md` (Tier 2).
-- Stages 0, A, B, C, D done and pushed. Stage E in progress: plan in TODO E.1 (committed 9d5ff70).
+- Stages 0, A, B, C, D done and pushed. Stage E in progress (TODO E.1), committed locally, **not pushed** (push at
+  the end of the stage).
 - Owner, session 10: NeoForge stays fail-closed on a deleted `config/` (E.1f proves the way back); packs run as real
-  dev clients; Prism 1.21.11 copied as it is today; **no Quilt in Stage E** (decisions.md 2026-10-27).
-- Built, uncommitted until green: PackDriver (+ hooks per loader), `runPackClient` per loader, `pack-fetch.py`,
-  `pack-copy-instance.sh`, `pack-smoke.sh`, ClientGate logging each locked change, `Exclusions.IGNORED` `*.lock`.
-- Installed: all 9 Modrinth packs under `run/packs/<node>/<loader>-<slug>/` and the Prism copy at
-  `run/packs/1.21.11/fabric-prism/` (409 files verified).
+  dev clients; Prism 1.21.11 copied as it is today; no Quilt in Stage E (decisions.md 2026-10-27).
+- Pack runs pass (exit 0, commit + 4 reopens): fabric/forge/neoforge 26.3. Findings so far: `*.lock` ignored
+  (Controlify), client logs each locked change. NeoForge 26.3 pack needed Sodium + Reese's swapped (pack.txt).
+- Running at checkpoint: the six 26.1.2/26.2 pairs (`build/pack-smoke-<loader>-<node>.out`).
 
 ## Next
-1. Finish E.1d pair by pair (fabric 26.3 first), recording each run in TODO E.1e. Then commit + push E.1a-c.
-2. E.1f (NeoForge way back), E.2 (scan time: `/commit` preview ~2 s on 148 mods already).
+1. Read the six results; fix and rerun failures. Then the Prism copy: `LOADER=fabric NODE=1.21.11
+   PACK=run/packs/1.21.11/fabric-prism bash scripts/pack-smoke.sh` (expect dev-environment mod failures: report).
+2. E.1f (NeoForge way back: dev server `--world` on an uncommitted world), E.2 (scan time).
+3. Raise with the owner at F: Commitment's loader floor is the dev pin; every NeoForge/Forge pack asks for less.
 - Untested: SettingsLock/CommitmentServer catch blocks around the tick check (TODO C.6).
 - Stale bookkeeping: C.1 checkbox unticked though done; C.2b bullet 3 waits on E.1.
 

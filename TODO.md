@@ -1217,6 +1217,15 @@ NeoForge and Forge first** (step C.0), so Proof 2 runs on all nine loader × nod
       → swapped to 2.2.6-beta.1 (`S9MvJoF5`); run 3 stuck on NeoForge's warnings screen (11 mods' deprecated `logoFile`,
       every launch) → the driver presses Continue when there are no errors. **Run 4 exit 0**, commit + 4 reopens
       matched, audit clean. Full build after: green, 296 ×4, 12 ×4, GameTests 10/10 pairs.
+      **26.1.2 and 26.2 (one batch, then reruns):** neoforge 26.2 (28 mods; 21 `logoFile` warnings pressed), forge 26.2
+      (10 mods; the experimental prompt proceeded once) and neoforge 26.1.2 (30 mods) exit 0 first time. fabric 26.1.2
+      exit 1, **a real false lock** on the first reopen: Crash Assistant prunes its localization overrides when the
+      first game quits, Language Reload rewrites `languagereload.json` at startup → IGNORED / NEVER_LOCKED (ExclusionsTest
+      29 → 34 per node; mutation 2 red); the pack reinstalled fresh to rerun the first session (old install in
+      `build/packs-replaced/`): **exit 0** (151 mods, 3 resource packs, 90 config files). fabric 26.2 exit 2: ModernFix's
+      dev-only mixin crashed the dev client → `mixin.devenv=false` in that pack (pack.txt); **exit 0**. forge 26.1.2
+      exit 2: World No Particles' `@OnlyIn`, refused by Forge 64.1.5 → `pack-fetch.py drop` (leaf mod); **exit 0**.
+      **All 9 Modrinth pairs exit 0.** Full build after: green, common 301 ×4, fabric 12 ×4, GameTests 10/10 pairs.
       - [ ] E.1f NeoForge's way back: a dev-server check: committed world, `config/` moved away, boot an **uncommitted**
             world once (`--world`), then the committed world opens. If the uncommitted boot doesn't write the file,
             the threat table says so instead.

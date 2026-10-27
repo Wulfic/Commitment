@@ -388,3 +388,22 @@ loader to add Commitment. On NeoForge 26.3 that update breaks the pack's Sodium 
 NeoForge-patched signature that changed); Sodium 0.9.3-beta.1 is the player's next step, done with `pack-fetch.py swap`.
 **Open:** whether F lowers the floor (needs a build or a boot on the lower loader). Raised with the owner.
 **Affects:** neoforge|forge mods.toml floors, TODO E.1 runs, Stage F
+
+## 2026-10-27 — A pack's first session rewrites files a later session never touches again
+**Symptom:** Fabulously Optimized 26.1.2 locked on its first reopen: 7 Crash Assistant localization overrides and
+`languagereload.json` "changed". 26.3's FO stayed clean.
+**Cause:** Crash Assistant prunes the pack's localization overrides when the first game quits (70 keys → 50); Language
+Reload rewrites its config at startup. A player who commits in the pack's first session gets a false lock.
+**Fix:** IGNORED `crash_assistant/crash_assistant_localization_overrides/`; NEVER_LOCKED `languagereload.json` (the
+language, free like options.txt's `lang`). Tests both ways, mutation red.
+**Rule:** a rerun on a pack dir that already ran doesn't reproduce first-session rewrites: reinstall the pack
+(`pack-fetch.py`) before proving a fix for one. The old install goes to `build/packs-replaced/`.
+**Affects:** common/.../manifest/Exclusions.java
+
+## 2026-10-27 — Dev-environment-only failures in real packs
+**Facts:** ModernFix's `devenv` mixin (applies only in a dev run) crashes the Fabric 26.2 client; off with
+`mixin.devenv=false` in that pack's `config/modernfix-mixins.properties` (recorded in pack.txt, before the commit).
+Forge 64.1.5 refuses `@OnlyIn` mod classes: World No Particles (Fastly Optimised 26.1.2) dropped with
+`pack-fetch.py drop` (a leaf mod; the pack asks for Forge 64.0.8). Fabric's log prints `(commitment) Commitment:`
+where NeoForge/Forge print `[commitment/]: Commitment:`: match both (`[])]:? `).
+**Affects:** run/packs/*/pack.txt, scripts/pack-smoke.sh, scripts/client-locked-smoke.sh
