@@ -7,6 +7,7 @@ import com.wulfic.commitment.lock.GuardPack;
 import com.wulfic.commitment.lock.LockStore;
 import com.wulfic.commitment.lock.MirrorDir;
 import com.wulfic.commitment.lock.WorldLock;
+import com.wulfic.commitment.lock.WorldSettings;
 import com.wulfic.commitment.manifest.GameEnvironment;
 import com.wulfic.commitment.platform.Platform;
 import java.io.IOException;
@@ -17,6 +18,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.OptionalLong;
+import java.util.SortedMap;
 import java.util.UUID;
 import java.util.WeakHashMap;
 import net.minecraft.nbt.CompoundTag;
@@ -37,6 +39,13 @@ public final class CommitmentServer {
 
 	/** Servers whose world needs the heartbeat. Weak, so a stopped integrated server isn't kept alive by this. */
 	private static final Map<MinecraftServer, Boolean> BEATING = Collections.synchronizedMap(new WeakHashMap<>());
+	/** The committed game settings each committed world's server puts back. */
+	private static final Map<MinecraftServer, Held> HELD = Collections.synchronizedMap(new WeakHashMap<>());
+	/** How often the settings are checked: once a second. */
+	public static final int CHECK_TICKS = 20;
+
+	private record Held(SortedMap<String, String> settings, WorldSettings.Throttle throttle) {
+	}
 
 	private CommitmentServer() {
 	}
@@ -66,8 +75,11 @@ public final class CommitmentServer {
 		Path world = worldDir(server);
 		boolean committed;
 		try {
-			committed = WorldLock.open(world, store(), OptionalLong.of(server.overworld().getSeed()), WorldLock.Repair.ONLY_IF_MISSING)
-					instanceof LockStore.Loaded.Locked;
+			LockStore.Loaded loaded = WorldLock.open(world, store(), OptionalLong.of(server.overworld().getSeed()), WorldLock.Repair.ONLY_IF_MISSING);
+			committed = loaded instanceof LockStore.Loaded.Locked;
+			if (loaded instanceof LockStore.Loaded.Locked locked) {
+				hold(server, locked.record().worldSettings());
+			}
 		} catch (IOException e) {
 			// The gate keeps a world it can't read closed; one that got this far is open. The mod is here, so the
 			// heartbeat is the truth, and the guard pack mustn't blind anyone for an I/O error.
@@ -87,12 +99,54 @@ public final class CommitmentServer {
 
 	public static void stopped(MinecraftServer server) {
 		BEATING.remove(server);
+		HELD.remove(server);
 	}
 
 	/** Every server tick, after the world and the functions have ticked. */
 	public static void tick(MinecraftServer server) {
 		if (BEATING.containsKey(server)) {
 			heartbeat(server);
+		}
+		if (server.getTickCount() % CHECK_TICKS == 0) {
+			checkSettings(server);
+		}
+	}
+
+	/**
+	 * Starts putting back the committed game settings: at server start for a committed world, and at {@code /commit
+	 * confirm}. Puts back anything already drifted at once, so a value changed while the mod was away is set back as
+	 * the world opens. A record with no settings (damaged, or committed before they were locked) holds nothing.
+	 */
+	public static void hold(MinecraftServer server, SortedMap<String, String> settings) {
+		if (settings.isEmpty()) {
+			Commitment.LOGGER.info("Commitment: world {} has no committed game settings; none are held", worldDir(server).getFileName());
+			return;
+		}
+		HELD.put(server, new Held(settings, new WorldSettings.Throttle()));
+		Commitment.LOGGER.info("Commitment: holding {} committed game settings in world {}", settings.size(), worldDir(server).getFileName());
+		checkSettings(server);
+	}
+
+	/** Whether this server puts committed game settings back. */
+	public static boolean holding(MinecraftServer server) {
+		return HELD.containsKey(server);
+	}
+
+	/**
+	 * Runs inside the server tick, so nothing may escape it: a world that crashes every second is worse than one whose
+	 * settings go unheld until the next start, which is what happens, logged, if the settings can't even be read.
+	 */
+	private static void checkSettings(MinecraftServer server) {
+		Held held = HELD.get(server);
+		if (held == null) {
+			return;
+		}
+		try {
+			SettingsLock.check(server, held.settings(), held.throttle());
+		} catch (RuntimeException e) {
+			HELD.remove(server);
+			Commitment.LOGGER.error("Commitment: can't read the game settings of world {}; they aren't held until the next start",
+					worldDir(server).getFileName(), e);
 		}
 	}
 

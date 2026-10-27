@@ -385,3 +385,22 @@ likely to move again. Reusing the commands' code keeps one path that saves a tim
 **Rejected:** Version-blocked `render`/`extractRenderState` overrides. Having the screen write the record itself
 (a second timer path to keep in step). Literal strings (no translation; the client test clicks buttons by key).
 **Affects:** common/.../client/LockedScreen.java, ClientGate.java, assets/commitment/lang/en_us.json
+
+## 2026-10-26 — C.6 also locks LAN guest commands and each player's own gamemode
+**Context:** C.6 facts (javap, all four nodes): 26.2+ splits cheats into the world's saved `allowCommands` and Open
+to LAN's guest command access, and 26.3 adds a World Options screen whose one Apply can turn cheats on, set the
+host's own gamemode, and turn cheats off again. Reverting cheats a second later leaves the gamemode changed. The
+spec locked only the world's default gamemode. The 20-tick check can't tell who made a change.
+**Choice:** Owner (session 8): (1) guest command access is locked with cheats. (2) Each player's own gamemode is
+held, but only on an integrated server (singleplayer/LAN) committed with cheats **off**: a player online at
+`/commit confirm` is held at their gamemode then, anyone else at the committed default gamemode; a hardcore world's
+spectator (death) is left alone. Worlds committed with cheats on, and dedicated servers, don't hold player
+gamemodes. (3) "Commitment: <setting> is locked" goes to every online player and the log, at most once per setting
+every 10 s.
+**Why:** Any switch that grants commands is cheats, whoever uses it. Where commands are allowed, `/gamemode` is
+legitimate and a hold would fight it; where they aren't, a gamemode change is a way around the lock.
+**Rejected:** Leaving guest access free (a second LAN account could `/gamemode` the host). Holding gamemodes
+everywhere (fights an op's admin work and a cheats-on world's own commands). Everyone at the default gamemode (would
+flip a host whose gamemode differed at commit). Messaging only ops, or only "the player who changed it" (unknowable
+from a periodic check).
+**Affects:** TODO C.6, common WorldSettings, CommitmentServer, the snapshot at `/commit confirm`

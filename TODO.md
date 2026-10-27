@@ -961,13 +961,93 @@ NeoForge and Forge first** (step C.0), so Proof 2 runs on all nine loader × nod
       heartbeat writing `beating` instead of `alive` → `:fabric:26.3:runGameTest` "2 failed"; no guard pack in the
       vanilla copy → vanilla smoke exit 1 (no pack line, no guard line). `./gradlew build` exit 0 on 13 nodes: common 268
       per node, fabric 12, GameTests 5 of ours on all ten, 0 failed, no javac warnings.
-- [ ] C.6 World settings, reverted live (owner, session 3). Facts first from each node's jar: how
+- [x] C.6 World settings, reverted live (owner, session 3). Facts first from each node's jar: how
       game rules are enumerated and set (26.x registry-based rules), where `/difficulty`, the
       difficulty button and Open to LAN's cheats toggle write, and whether hardcore can be set back.
       Then: snapshot at `/commit confirm`, a revert check every 20 ticks and at server start, and the
       message. Server GameTests: `/gamerule` and `/difficulty` each put back within 20 ticks, with the
       message; an uncommitted world left alone. `scripts/checks/rules-revert.txt` on each loader
       (`@expect Commitment: difficulty is locked`).
+      **Facts (javap, session 8, Mojang-named common + client jars 1.21.11/26.1.2/26.2/26.3):**
+      - Game rules are registry-based on all four, one API: `GameRules.availableRules()`, `getAsString(rule)`,
+        `rule.deserialize(String)` → `DataResult`, `set(rule, value, MinecraftServer)`, `rule.getIdentifier()`. Reached
+        through `server.overworld().getGameRules()` on all four (1.21.11 keeps them on `WorldData`, 26.x on the server).
+      - Difficulty: `MinecraftServer.setDifficulty(Difficulty, boolean force)`, `setDifficultyLocked(boolean)`,
+        `WorldData.getDifficulty()/isDifficultyLocked()`; `Difficulty.getSerializedName()/byName`. Default gamemode:
+        `getDefaultGameType()/setDefaultGameType(GameType)`; `GameType.getName()/byName`. A player's: `ServerPlayer.
+        gameMode()/setGameMode(GameType)`. All four the same.
+      - **Hardcore has no setter on any node** (`WorldData.isHardcore()` only), so it's checked at world open, per the
+        spec. In `level.dat` (NBT paths walked in the dev worlds): `Data.difficulty_settings.hardcore` on 26.1.2/26.2/
+        26.3, `Data.hardcore` on 1.21.11. (A first string search said `Data.hardcore` everywhere: wrong, caught by the
+        fixture test; gotchas.md.)
+      - **Cheats differ.** 1.21.11/26.1.2: the world's `allowCommands` has no setter; Open to LAN's "Allow cheats" is
+        `PlayerList.setAllowCommandsForAllPlayers` (not saved; host included), then `sendPlayerPermissionLevel` per player.
+        26.2+: `WorldData.setAllowCommands` exists, set through `IntegratedServer.setWorldAllowCommands(boolean)`; LAN
+        guests are separate: 26.2 `commandsAllowedForOtherPlayers()/setCommandsAllowedForOtherPlayers`, 26.3
+        `getGuestCommandAccess()/setGuestCommandAccess`. 26.3 drops `PlayerList.setAllowCommandsForAllPlayers` and adds
+        `MinecraftServer.forceGameMode()/setForceGameMode`. `IntegratedServer` is a client class.
+      - 26.3's new `WorldOptionsScreen.applyChanges` calls `setWorldAllowCommands`, `setForceGameMode`,
+        `setWorldGameType`, `setPersonalGameType` and `setGuestCommandAccess` in one Apply: cheats on + own gamemode
+        creative + cheats off is one click. Hence the owner's ruling below.
+      **Owner, session 8 (decisions.md 2026-10-26):** guest command access is locked with cheats; each player's own
+      gamemode is held on an integrated server committed with cheats off (online at commit → their gamemode then,
+      anyone else → the committed default gamemode, hardcore's spectator left alone); not on dedicated servers or
+      cheats-on worlds. The message goes to everyone and the log, at most once per setting per 10 s.
+      **Plan (session 8, before code):**
+      1. `common/.../lock/WorldSettings` (pure, JUnit): the key names (`difficulty`, `difficulty_locked`,
+         `default_gamemode`, `force_gamemode`, `allow_commands`, `guest_commands`, `hardcore`, `gamerule/<id>`,
+         `gamemode/<uuid>`, `gamemode/*` for anyone without an entry), `reverts(committed, current)` extended: a player
+         key held by its own entry else `gamemode/*`, never when neither exists; `spectator` left alone in a committed
+         hardcore world; `hardcore` never reverted live. `label(name)` → "difficulty", "game rule <id>", "gamemode".
+         `Throttle` (per setting, 200 ticks). Tests: each key kind, the fallback, the hardcore exception, an unknown or
+         missing rule, the throttle window.
+      2. `common/.../server/SettingsLock` (Minecraft-facing, `//? if` blocks for the cheats/guest/force differences;
+         the `IntegratedServer` calls in `client/IntegratedSettings`, loaded only when `Platform.loader().
+         physicalClient()`): `snapshot(server)` on the server thread, `current(server)`, `apply(server, revert)` (a value
+         that doesn't parse is logged and skipped, never guessed). Dedicated: no `allow_commands`, `guest_commands` or
+         player keys. Cheats-on at commit (1.21.11/26.1.2: world flag or LAN flag; 26.2+: world flag): no guest or player
+         keys. `CommitmentServer` holds the committed settings per server (like `BEATING`): loaded in `started()` and
+         checked at once (the at-open revert), set at `/commit confirm`, checked every 20 ticks in `tick()`. Each revert
+         logged `Commitment: put back <name>: <current> -> <committed>`; the message to every player via the throttle.
+      3. Snapshot at `/commit confirm`: `CommitmentCommands` takes it on the server thread before the async work and
+         hands it to `CommitActions.commit` (replacing the empty map); the reply's COMMITTED effect starts the hold.
+      4. Hardcore at open: `WorldSeed`'s NBT walker learns a byte; `WorldGate.evaluate` adds `Hardcore changed since
+         /commit` when the record has `hardcore` and `level.dat` disagrees, and fails closed (`Hardcore can't be read
+         from level.dat`) when it can't be read. JUnit on copies of the dev worlds' `level.dat` (1.21.11 and 26.3 layout)
+         with the byte flipped.
+      5. Proof: server GameTest in `CommandsGameTest`'s sequence (the one test that commits the shared world): before
+         commit `/difficulty` and `/gamerule` stay changed 40 ticks (uncommitted left alone) and are set back by the
+         test; after commit each is back within 20 ticks with the message. Fabric client GameTest (integrated server, all
+         four nodes): commit with cheats off, then what World Options' Apply does (the version's setters) + own gamemode
+         creative → all back within 20 ticks. Dev-server smoke `scripts/checks/rules-revert.txt` after `commit-flow.txt`
+         on all ten pairs (`difficulty hard`, `gamerule <rule> <other value>`, `defaultgamemode creative` → `@expect` each
+         `is locked` and the value queried back). The at-open revert of a value edited with the mod gone is D.1's row.
+      6. Mutations: the tick check off → GameTest red; throttle off → JUnit red; hardcore check off → JUnit red; the
+         spectator exception off → JUnit red; snapshot empty → GameTest red.
+      **Not doing:** blocking the commands or buttons themselves (decisions.md 2026-10-21: one periodic check);
+      holding gamemodes on dedicated servers; NeoForge/Forge client GameTests for the integrated-only keys (same common
+      code; Fabric's client test proves it on all four nodes); worlds committed before C.6 (dev worlds only; their
+      record holds no settings, so nothing is held).
+      **Blast radius:** while committed, Commitment sets vanilla settings through vanilla's API, which vanilla saves:
+      a wrong snapshot or a revert in an uncommitted world would change a player's settings. Guards: held only for a
+      `Locked` record; an empty or unparsable value is never applied; every write is logged with before → after (the
+      undo is the command for the old value). Tests: an uncommitted world gets no writes. Dev worlds only.
+      **Rollback:** `git revert` of the C.6 commits.
+      **Done, session 8 (2026-10-26).** As planned, plus: each revert runs in its own try/catch (one setting that can't
+      be set mustn't stop the others or the tick), and a `current()` that throws ends the hold for that session, logged
+      (a world that crashes every second is worse); **neither catch has a test** (no practical way to make a vanilla
+      rule throw in a GameTest). The client test changes the host's gamemode on its own: on 26.3 the cheats setters
+      re-apply the world's gamemode to a host without commands themselves when force-gamemode is on, which hid ours.
+      **Rung 1:** `./gradlew build` exit 0 on 13 nodes: common **289** per node (21 new), fabric 12, 0 failed, no javac
+      warnings. **Rung 2:** GameTests 5 of ours on all ten pairs, 0 failed; `put back difficulty` logged on all ten.
+      **Rung 5:** `:fabric:<n>:runClientGameTest` exit 0 on 1.21.11, 26.1.2, 26.2, 26.3: `settings put back and told`
+      (gamemode, difficulty, LAN guests' commands; cheats on 26.2/26.3), then `client gate check: PASS` (the reopen read
+      each node's real `level.dat` for hardcore). **Rung 3:** `commit-smoke.sh commit-flow.txt rules-revert.txt` **exit 0
+      on all ten pairs** (`holding 62` settings, 63 on 26.3; `put back difficulty: hard -> easy`, `gamerule/minecraft:
+      random_tick_speed: 7 -> 3`, `default_gamemode: creative -> survival`, each `is locked`, `The difficulty is Easy`;
+      no `can't put back`; the lock's 3 files removed per pair). **Mutations, each red and restored (`cmp`):** spectator
+      exception off (1 JUnit red), throttle off (2), hardcore gate off (1), the 20-tick check off (GameTest "put back
+      within a check" and fabric 26.3 smoke exit 1, 7 `@expect`s), an empty snapshot (GameTest "settings are held").
 
 ### Stage D: tamper matrix (disposable world copies only)
 

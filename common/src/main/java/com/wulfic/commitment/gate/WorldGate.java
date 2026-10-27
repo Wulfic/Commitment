@@ -7,12 +7,14 @@ import com.wulfic.commitment.lock.LockStore;
 import com.wulfic.commitment.lock.TrustedClock;
 import com.wulfic.commitment.lock.UnlockTimer;
 import com.wulfic.commitment.lock.WorldLock;
+import com.wulfic.commitment.lock.WorldSettings;
 import com.wulfic.commitment.manifest.GameEnvironment;
 import com.wulfic.commitment.manifest.Manifest;
 import com.wulfic.commitment.manifest.ManifestDiff;
 import com.wulfic.commitment.manifest.ManifestScanner;
 import java.io.IOException;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
@@ -25,6 +27,8 @@ public final class WorldGate {
 	/** Changes shown on the locked screen or in the server log before "...and K more changes". */
 	public static final int MAX_LINES = 12;
 	static final String TAMPERED_LINE = "The lock record was damaged or deleted, so the world stays locked whatever its setup";
+	/** Hardcore can't be set back while the world runs (no node has a setter), so a changed flag is a setup change. */
+	static final String HARDCORE_LINE = "Hardcore changed since /commit (was %s, now %s)";
 
 	public sealed interface Verdict {
 		/** Never committed: opens as vanilla would. */
@@ -72,6 +76,21 @@ public final class WorldGate {
 		if (record.tampered()) {
 			return new Verdict.Locked(record, List.of(TAMPERED_LINE), timer);
 		}
+		List<String> changes = new ArrayList<>();
+		String committedHardcore = record.worldSettings().get(WorldSettings.HARDCORE);
+		if (committedHardcore != null) {
+			boolean was = Boolean.parseBoolean(committedHardcore);
+			boolean now;
+			try {
+				now = WorldSeed.hardcore(world);
+			} catch (IOException e) {
+				Commitment.LOGGER.error("Commitment: can't read whether {} is hardcore from its {}: {}", world, WorldSeed.LEVEL_DAT, e.getMessage());
+				return new Verdict.Failed("can't read " + WorldSeed.LEVEL_DAT + ": " + e.getMessage());
+			}
+			if (now != was) {
+				changes.add(HARDCORE_LINE.formatted(onOff(was), onOff(now)));
+			}
+		}
 		Manifest current;
 		try {
 			current = ManifestScanner.scan(env);
@@ -80,7 +99,14 @@ public final class WorldGate {
 			return new Verdict.Failed("can't read the setup: " + e.getMessage());
 		}
 		ManifestDiff diff = record.manifest().diff(current);
-		return diff.isEmpty() ? new Verdict.Open(record, timer) : new Verdict.Locked(record, diff.lines(MAX_LINES), timer);
+		if (!diff.isEmpty()) {
+			changes.addAll(diff.lines(MAX_LINES - changes.size()));
+		}
+		return changes.isEmpty() ? new Verdict.Open(record, timer) : new Verdict.Locked(record, changes, timer);
+	}
+
+	private static String onOff(boolean flag) {
+		return flag ? "on" : "off";
 	}
 
 	/**

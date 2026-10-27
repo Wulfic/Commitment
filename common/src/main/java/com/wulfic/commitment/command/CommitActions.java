@@ -13,8 +13,10 @@ import com.wulfic.commitment.manifest.ManifestScanner;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.time.ZoneId;
+import java.util.Collections;
 import java.util.List;
 import java.util.OptionalLong;
+import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.UUID;
 import java.util.function.Supplier;
@@ -37,14 +39,22 @@ public final class CommitActions {
 		NONE,
 		/** Open the 60-second confirm window. */
 		ASK,
-		/** The world was committed just now: start the heartbeat and enable the guard pack. */
+		/** The world was committed just now: start the heartbeat, enable the guard pack and hold its game settings. */
 		COMMITTED
 	}
 
-	/** @param failure the lines say why nothing was done (sent as an error) */
-	public record Reply(List<String> lines, boolean failure, Effect effect) {
+	/**
+	 * @param failure  the lines say why nothing was done (sent as an error)
+	 * @param settings with {@link Effect#COMMITTED}, the game settings now locked; empty otherwise
+	 */
+	public record Reply(List<String> lines, boolean failure, Effect effect, SortedMap<String, String> settings) {
 		public Reply {
 			lines = List.copyOf(lines);
+			settings = Collections.unmodifiableSortedMap(new TreeMap<>(settings));
+		}
+
+		public Reply(List<String> lines, boolean failure, Effect effect) {
+			this(lines, failure, effect, new TreeMap<>());
 		}
 
 		static Reply info(String... lines) {
@@ -71,15 +81,18 @@ public final class CommitActions {
 				"Run /commit confirm within 60 s to lock it."), false, Effect.ASK);
 	}
 
-	/** {@code /commit confirm}: scans the setup again (it may have changed since {@code /commit}) and locks it. */
-	public static Reply commit(GameEnvironment env, LockStore store, long seed, Supplier<UUID> newLockId, long now) throws IOException {
+	/**
+	 * {@code /commit confirm}: scans the setup again (it may have changed since {@code /commit}) and locks it, with the
+	 * game settings the server thread snapshotted for it.
+	 */
+	public static Reply commit(GameEnvironment env, LockStore store, long seed, SortedMap<String, String> settings, Supplier<UUID> newLockId,
+			long now) throws IOException {
 		Path world = env.worldDir();
 		if (open(env, store, seed) instanceof LockStore.Loaded.Locked) {
 			return Reply.fail(ALREADY_COMMITTED);
 		}
 		Manifest setup = ManifestScanner.scan(env);
-		// World settings are snapshotted here once C.6 reverts them; until then the record holds none.
-		LockRecord record = LockRecord.committed(newLockId.get(), seed, world.getFileName().toString(), now, setup, new TreeMap<>());
+		LockRecord record = LockRecord.committed(newLockId.get(), seed, world.getFileName().toString(), now, setup, settings);
 		store.create(world, record);
 		String done = COMMITTED.formatted(setup.counts().describe());
 		Commitment.LOGGER.info("{} in {} (lock {})", done, world, record.lockId());
@@ -94,9 +107,9 @@ public final class CommitActions {
 		}
 		if (packTrouble != null) {
 			return new Reply(List.of(done, "Commitment: but the guard pack couldn't be written (" + packTrouble
-					+ "); the lock holds while Commitment is installed, and the next world start tries again"), false, Effect.COMMITTED);
+					+ "); the lock holds while Commitment is installed, and the next world start tries again"), false, Effect.COMMITTED, settings);
 		}
-		return new Reply(List.of(done), false, Effect.COMMITTED);
+		return new Reply(List.of(done), false, Effect.COMMITTED, settings);
 	}
 
 	/** {@code /commit status}. Reads internet time only while a timer runs. */

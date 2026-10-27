@@ -14,10 +14,11 @@ import java.util.OptionalLong;
 import java.util.zip.GZIPInputStream;
 
 /**
- * A world's seed, read before the world loads. On 26.x it's saved data of its own, {@code
+ * A world's seed and hardcore flag, read before the world loads. On 26.x the seed is saved data of its own, {@code
  * data/minecraft/world_gen_settings.dat}, gzip NBT shaped {@code {data:{seed:<long>, ...}}}; on 1.21.11 it's in
- * {@code level.dat}, {@code {Data:{WorldGenSettings:{seed:<long>, ...}}}}. Read here rather than through vanilla's
- * {@code NbtIo}, whose signatures change between nodes. Read-only, never written.
+ * {@code level.dat}, {@code {Data:{WorldGenSettings:{seed:<long>, ...}}}}. Hardcore is in {@code level.dat}: {@code
+ * {Data:{difficulty_settings:{hardcore:<byte>}}}} on 26.x, {@code {Data:{hardcore:<byte>}}} on 1.21.11. Read here rather than through vanilla's {@code NbtIo}, whose signatures change
+ * between nodes. Read-only, never written.
  */
 public final class WorldSeed {
 	public static final String FILE = "data/minecraft/world_gen_settings.dat";
@@ -25,11 +26,14 @@ public final class WorldSeed {
 	public static final String LEVEL_DAT = "level.dat";
 	private static final String[] FILE_PATH = {"data", "seed"};
 	private static final String[] LEVEL_DAT_PATH = {"Data", "WorldGenSettings", "seed"};
+	private static final String[] HARDCORE_PATH = {"Data", "difficulty_settings", "hardcore"};
+	private static final String[] HARDCORE_PATH_1_21 = {"Data", "hardcore"};
 	/** The real files are a few KB; this only stops a crafted gzip from filling memory. */
 	private static final int MAX_DECODED = 4 * 1024 * 1024;
 	private static final int MAX_DEPTH = 64;
 
 	private static final byte END = 0;
+	private static final byte BYTE = 1;
 	private static final byte LONG = 4;
 	private static final byte COMPOUND = 10;
 
@@ -67,10 +71,28 @@ public final class WorldSeed {
 	}
 
 	/**
+	 * Whether the world is hardcore, from its {@code level.dat}. A {@code level.dat} without the flag is not hardcore, as
+	 * vanilla reads it. Throws when there's no {@code level.dat} or it can't be read: the caller fails closed.
+	 */
+	public static boolean hardcore(Path worldDir) throws IOException {
+		byte[] levelDat = Files.readAllBytes(worldDir.resolve(LEVEL_DAT));
+		OptionalLong flag = parse(levelDat, BYTE, HARDCORE_PATH);
+		if (flag.isEmpty()) {
+			flag = parse(levelDat, BYTE, HARDCORE_PATH_1_21);
+		}
+		return flag.isPresent() && flag.getAsLong() != 0;
+	}
+
+	/**
 	 * The long at {@code path} (compound names, then the long's name) in the gzip NBT, or empty when it isn't there or
 	 * isn't a long.
 	 */
 	static OptionalLong parse(byte[] gzip, String... path) throws IOException {
+		return parse(gzip, LONG, path);
+	}
+
+	/** The tag of {@code type} (a byte or a long) at {@code path}, as a long, or empty when it isn't there or is another type. */
+	private static OptionalLong parse(byte[] gzip, byte type, String... path) throws IOException {
 		byte[] nbt;
 		try (InputStream in = new GZIPInputStream(new ByteArrayInputStream(gzip))) {
 			nbt = in.readNBytes(MAX_DECODED + 1);
@@ -83,20 +105,20 @@ public final class WorldSeed {
 			throw new IOException("the root isn't a compound");
 		}
 		skipString(in);
-		return find(in, path, 0);
+		return find(in, type, path, 0);
 	}
 
-	/** In the compound being read, follows {@code path[depth..]}: compounds down to the long at the end. */
-	private static OptionalLong find(DataInputStream in, String[] path, int depth) throws IOException {
+	/** In the compound being read, follows {@code path[depth..]}: compounds down to the tag of {@code type} at the end. */
+	private static OptionalLong find(DataInputStream in, byte want, String[] path, int depth) throws IOException {
 		boolean last = depth == path.length - 1;
 		for (byte type; (type = in.readByte()) != END; ) {
 			String name = readString(in);
 			if (name.equals(path[depth])) {
-				if (last && type == LONG) {
-					return OptionalLong.of(in.readLong());
+				if (last && type == want) {
+					return OptionalLong.of(want == LONG ? in.readLong() : in.readByte());
 				}
 				if (!last && type == COMPOUND) {
-					return find(in, path, depth + 1);
+					return find(in, want, path, depth + 1);
 				}
 				return OptionalLong.empty();
 			}
@@ -154,7 +176,7 @@ public final class WorldSeed {
 		skipBytes(in, in.readUnsignedShort());
 	}
 
-	/** NBT names are modified UTF-8; the two names looked for here are ASCII, which reads the same either way. */
+	/** NBT names are modified UTF-8; the names looked for here are ASCII, which reads the same either way. */
 	private static String readString(DataInputStream in) throws IOException {
 		int length = in.readUnsignedShort();
 		if (length > in.available()) {

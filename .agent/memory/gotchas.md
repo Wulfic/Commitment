@@ -272,3 +272,11 @@ turns onboarding off by itself, so it never showed there.
 neoforge.mods.toml. `client-locked-smoke.sh` sets `onboardAccessibility:false` in the dev client's own options.txt
 and fails on "Mod commitment uses" / "Mods loaded with N warning". Forge 26.x doesn't warn on `logoFile`.
 **Affects:** gradle.properties, neoforge/build.gradle, neoforge.mods.toml, scripts/client-locked-smoke.sh
+
+## 2026-10-26 — level.dat moved hardcore into `difficulty_settings` on 26.x; a byte search can't tell you the path
+**Symptom:** C.6's hardcore read passed on 1.21.11's level.dat and read "not hardcore" from a flipped 26.3 one.
+**Cause:** The fact came from searching the decompressed bytes for `hardcore`, which finds the name, not its parent.
+26.x keeps `Data.difficulty_settings.{difficulty, hardcore, locked}`; 1.21.11 has `Data.hardcore`, `Data.Difficulty`,
+`Data.DifficultyLocked`.
+**Fix:** `WorldSeed.hardcore` tries the 26.x path, then 1.21.11's. Fixture test on both layouts with the byte flipped.
+**Dead ends:** Byte-searching NBT for a key. Walk the tree and print full paths (a 30-line Python walker does it).

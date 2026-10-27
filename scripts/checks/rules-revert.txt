@@ -1,0 +1,20 @@
+# C.6, boot 2 (after commit-flow.txt, through the wrapper): the committed world's game settings, changed from the
+# dedicated server's console, are put back within a second, logged and announced. The world was committed at the dev
+# server's own settings (difficulty easy from server.properties, random_tick_speed 3, default gamemode survival). Run:
+#   LOADER=<fabric|neoforge|forge> NODE=<1.21.11 (fabric only)|26.1.2|26.2|26.3> bash scripts/commit-smoke.sh \
+#       scripts/checks/commit-flow.txt scripts/checks/rules-revert.txt
+difficulty hard
+@wait Commitment: difficulty is locked
+difficulty
+@wait The difficulty is Easy
+gamerule random_tick_speed 7
+@wait Commitment: game rule minecraft:random_tick_speed is locked
+defaultgamemode creative
+@wait Commitment: the default gamemode is locked
+@expect Commitment: holding [0-9]+ committed game settings in world world
+@expect Commitment: put back difficulty: hard -> easy
+@expect Commitment: put back gamerule/minecraft:random_tick_speed: 7 -> 3
+@expect Commitment: put back default_gamemode: creative -> survival
+@reject Commitment: can't put back
+@reject Commitment: put back gamemode/
+@reject Commitment guard: Commitment is missing

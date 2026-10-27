@@ -9,11 +9,13 @@ import com.wulfic.commitment.lock.TrustedClock;
 import com.wulfic.commitment.manifest.GameEnvironment;
 import com.wulfic.commitment.platform.Platform;
 import com.wulfic.commitment.server.CommitmentServer;
+import com.wulfic.commitment.server.SettingsLock;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Path;
 import java.time.ZoneId;
 import java.util.Set;
+import java.util.SortedMap;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
@@ -57,8 +59,12 @@ public final class CommitmentCommands {
 		dispatcher.register(Commands.literal("commit").requires(CommitmentCommands::allowed)
 				.executes(c -> work(c.getSource(), "/commit", Confirmations.Kind.COMMIT,
 						(env, store, seed) -> CommitActions.preview(env, store, seed, clock(), ZoneId.systemDefault())))
-				.then(Commands.literal("confirm").executes(c -> confirm(c.getSource(), "/commit", Confirmations.Kind.COMMIT,
-						(env, store, seed) -> CommitActions.commit(env, store, seed, UUID::randomUUID, System.currentTimeMillis()))))
+				.then(Commands.literal("confirm").executes(c -> {
+					// The game settings are read here, on the server thread; the setup scan runs off it.
+					SortedMap<String, String> settings = SettingsLock.snapshot(c.getSource().getServer());
+					return confirm(c.getSource(), "/commit", Confirmations.Kind.COMMIT,
+							(env, store, seed) -> CommitActions.commit(env, store, seed, settings, UUID::randomUUID, System.currentTimeMillis()));
+				}))
 				.then(Commands.literal("status").executes(c -> work(c.getSource(), "/commit status", null,
 						(env, store, seed) -> CommitActions.status(env, store, seed, clock(), ZoneId.systemDefault())))));
 		dispatcher.register(Commands.literal("unlock").requires(CommitmentCommands::allowed)
@@ -182,6 +188,7 @@ public final class CommitmentCommands {
 			case COMMITTED -> {
 				CommitmentServer.beat(server);
 				CommitmentServer.select(server);
+				CommitmentServer.hold(server, result.settings());
 			}
 			case NONE -> {
 			}

@@ -1,8 +1,10 @@
 package com.wulfic.commitment.gate;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -21,7 +23,8 @@ import org.junit.jupiter.api.io.TempDir;
 
 /**
  * C.2: the seed, read from real files: world_gen_settings.dat written by the 26.1.2 and 26.3 dev servers, and the
- * level.dat of a 1.21.11 dev server world (../enchanting-2), where 1.21.11 keeps it.
+ * level.dat of a 1.21.11 dev server world (../enchanting-2), where 1.21.11 keeps it. C.6: the hardcore flag, from that
+ * level.dat and a 26.3 dev server's.
  */
 class WorldSeedTest {
 	@TempDir
@@ -167,7 +170,56 @@ class WorldSeedTest {
 		Files.write(world.resolve(WorldSeed.LEVEL_DAT), bytes);
 	}
 
-	private static byte[] fixture(String name) throws IOException {
+	@Test
+	void readsHardcoreFromTheLevelDatOfBothLayouts() throws IOException {
+		placeLevelDat(fixture("1.21.11-level.dat"));
+		assertFalse(WorldSeed.hardcore(world));
+		placeLevelDat(withHardcore(fixture("1.21.11-level.dat"), true));
+		assertTrue(WorldSeed.hardcore(world));
+		placeLevelDat(fixture("26.3-level.dat"));
+		assertFalse(WorldSeed.hardcore(world));
+		placeLevelDat(withHardcore(fixture("26.3-level.dat"), true));
+		assertTrue(WorldSeed.hardcore(world));
+	}
+
+	@Test
+	void aLevelDatWithoutTheFlagIsntHardcore() throws IOException {
+		placeLevelDat(gzip(nbt(out -> compound(out, "Data"))));
+		assertFalse(WorldSeed.hardcore(world));
+	}
+
+	@Test
+	void hardcoreCantBeReadWithoutALevelDat() throws IOException {
+		assertThrows(IOException.class, () -> WorldSeed.hardcore(world));
+		placeLevelDat(new byte[] {1, 2, 3});
+		assertThrows(IOException.class, () -> WorldSeed.hardcore(world));
+	}
+
+	/** A real {@code level.dat} with its {@code Data.hardcore} byte set to {@code flag}; fails if it has none. */
+	static byte[] withHardcore(byte[] levelDat, boolean flag) throws IOException {
+		byte[] nbt;
+		try (InputStream in = new GZIPInputStream(new ByteArrayInputStream(levelDat))) {
+			nbt = in.readAllBytes();
+		}
+		byte[] tag = {1, 0, 8, 'h', 'a', 'r', 'd', 'c', 'o', 'r', 'e'};
+		int at = indexOf(nbt, tag);
+		if (at < 0 || indexOf(Arrays.copyOfRange(nbt, at + 1, nbt.length), tag) >= 0) {
+			throw new AssertionError("the fixture must hold exactly one byte tag named hardcore");
+		}
+		nbt[at + tag.length] = (byte) (flag ? 1 : 0);
+		return gzip(nbt);
+	}
+
+	private static int indexOf(byte[] haystack, byte[] needle) {
+		for (int i = 0; i + needle.length <= haystack.length; i++) {
+			if (Arrays.equals(haystack, i, i + needle.length, needle, 0, needle.length)) {
+				return i;
+			}
+		}
+		return -1;
+	}
+
+	static byte[] fixture(String name) throws IOException {
 		try (InputStream in = WorldSeedTest.class.getResourceAsStream("/world-seed/" + name)) {
 			assertNotNull(in, "fixture world-seed/" + name + " is missing from the test classpath");
 			return in.readAllBytes();

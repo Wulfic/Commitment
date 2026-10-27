@@ -2,18 +2,24 @@ package com.wulfic.commitment.gametest;
 
 import com.wulfic.commitment.Commitment;
 import com.wulfic.commitment.client.ClientGate;
+import com.wulfic.commitment.client.IntegratedSettings;
 import com.wulfic.commitment.client.LockedScreen;
 import com.wulfic.commitment.lock.GuardPack;
 import com.wulfic.commitment.lock.LockCodec;
 import com.wulfic.commitment.lock.LockStore;
 import com.wulfic.commitment.lock.TrustedClock;
 import com.wulfic.commitment.lock.UnlockTimer;
+import com.wulfic.commitment.lock.WorldSettings;
 import com.wulfic.commitment.server.CommitmentServer;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.OptionalLong;
+import java.util.SortedMap;
 import java.util.UUID;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -33,6 +39,8 @@ import net.minecraft.client.gui.screens.ConfirmScreen;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.TitleScreen;
 import net.minecraft.server.MinecraftServer;
+import net.minecraft.world.Difficulty;
+import net.minecraft.world.level.GameType;
 
 /**
  * {@code /commit} and the client's world-open gate (C.2, C.3c) on a real client. The host commits a world with cheats
@@ -40,7 +48,9 @@ import net.minecraft.server.MinecraftServer;
  * {@code openWorld}, which proves the setup {@code /commit} scanned is the one the gate scans. One config file added,
  * the same call shows the {@link LockedScreen} (C.4) and no world loads. Its buttons, on a test internet clock: start
  * the 24-hour unlock, cancel it, start it again; seconds before it's due the countdown runs out and its button turns
- * into Open world, which still refuses; after the 24 hours the next open lifts the lock and the world loads.
+ * into Open world, which still refuses; after the 24 hours the next open lifts the lock and the world loads. C.6, on
+ * this integrated server: what World Options' Apply and Open to LAN can change (cheats, LAN guests' commands, the host's
+ * own gamemode) and the difficulty button are all put back, and the host is told.
  */
 public class WorldGateClientGameTest implements FabricClientGameTest {
 	static final String PASS = "Commitment client gate check: PASS";
@@ -86,6 +96,7 @@ public class WorldGateClientGameTest implements FabricClientGameTest {
 				waitOnServer(context, world, server -> server.getPackRepository().getSelectedIds().contains(CommitmentServer.GUARD_PACK_ID),
 						"the guard pack wasn't enabled after /commit confirm");
 				check(world.getServer().computeOnServer(CommitmentServer::beating), "no heartbeat after /commit confirm");
+				checkSettingsHeld(context, world, worldDir);
 				save = world.getWorldSave();
 			}
 			String levelId = worldDir.getFileName().toString();
@@ -230,6 +241,61 @@ public class WorldGateClientGameTest implements FabricClientGameTest {
 		} catch (AssertionError e) {
 			Commitment.LOGGER.error("Commitment client gate check failed: no expected reply to /{}; got {}", command,
 					RECEIVED.subList(from, RECEIVED.size()));
+			throw e;
+		}
+	}
+
+	/**
+	 * The world was committed with cheats off, so the host's own gamemode is held too. Changes everything the
+	 * integrated server's own setters can (as the World Options screen calls them) and waits for each to come back.
+	 */
+	private static void checkSettingsHeld(ClientGameTestContext context, TestSingleplayerContext world, Path worldDir) {
+		check(world.getServer().computeOnServer(CommitmentServer::holding), "no game settings held after /commit confirm");
+		long seed = world.getServer().computeOnServer(server -> server.overworld().getSeed());
+		SortedMap<String, String> committed;
+		try {
+			committed = ((LockStore.Loaded.Locked) CommitmentServer.store().load(worldDir, GuardPack.read(worldDir), OptionalLong.of(seed)))
+					.record().worldSettings();
+		} catch (IOException e) {
+			throw new UncheckedIOException("can't read the committed world's lock record", e);
+		}
+		UUID host = world.getServer().computeOnServer(server -> server.getPlayerList().getPlayers().getFirst().getUUID());
+		check("survival".equals(committed.get(WorldSettings.gamemode(host))) && "survival".equals(committed.get(WorldSettings.ANY_PLAYER))
+				&& "false".equals(committed.get(WorldSettings.GUEST_COMMANDS)), "the record doesn't hold the host's gamemode and guests' commands: " + committed);
+		boolean settable = IntegratedSettings.allowCommandsSettable();
+		check(!settable || "false".equals(committed.get(WorldSettings.ALLOW_COMMANDS)), "the record doesn't hold cheats off: " + committed);
+		Difficulty difficulty = world.getServer().computeOnServer(server -> server.getWorldData().getDifficulty());
+		Difficulty other = difficulty == Difficulty.HARD ? Difficulty.EASY : Difficulty.HARD;
+		int from = RECEIVED.size();
+		world.getServer().runOnServer(server -> {
+			server.setDifficulty(other, true);
+			IntegratedSettings.setGuestCommands(server, true);
+			if (settable) {
+				IntegratedSettings.setAllowCommands(server, true);
+			}
+		});
+		waitOnServer(context, world, server -> server.getWorldData().getDifficulty() == difficulty && !IntegratedSettings.guestCommands(server)
+				&& !(settable && server.getWorldData().isAllowCommands()), "the difficulty or cheats weren't put back");
+		List<String> told = new ArrayList<>(List.of("Commitment: difficulty is locked", "Commitment: LAN guests' commands are locked"));
+		if (settable) {
+			told.add("Commitment: cheats are locked");
+		}
+		waitToBeTold(context, from, told);
+		// Alone, as setPersonalGameType sets it: on 26.3 the cheats setters above re-apply the world's gamemode to a
+		// host without commands themselves (with force-gamemode on), which would hide whether Commitment did.
+		int fromGamemode = RECEIVED.size();
+		world.getServer().runOnServer(server -> server.getPlayerList().getPlayers().getFirst().setGameMode(GameType.CREATIVE));
+		waitOnServer(context, world, server -> server.getPlayerList().getPlayers().getFirst().gameMode() == GameType.SURVIVAL,
+				"the host's own gamemode wasn't put back");
+		waitToBeTold(context, fromGamemode, List.of("Commitment: gamemode is locked"));
+		Commitment.LOGGER.info("Commitment client gate check: settings put back and told");
+	}
+
+	private static void waitToBeTold(ClientGameTestContext context, int from, List<String> lines) {
+		try {
+			context.waitFor(client -> RECEIVED.subList(from, RECEIVED.size()).containsAll(lines), REPLY_TICKS);
+		} catch (AssertionError e) {
+			Commitment.LOGGER.error("Commitment client gate check failed: wasn't told {}; got {}", lines, RECEIVED.subList(from, RECEIVED.size()));
 			throw e;
 		}
 	}

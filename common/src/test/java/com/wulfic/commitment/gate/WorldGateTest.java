@@ -9,12 +9,14 @@ import com.wulfic.commitment.lock.LockRecord;
 import com.wulfic.commitment.lock.LockStore;
 import com.wulfic.commitment.lock.TrustedClock;
 import com.wulfic.commitment.lock.UnlockTimer;
+import com.wulfic.commitment.lock.WorldSettings;
 import com.wulfic.commitment.manifest.GameEnvironment;
 import com.wulfic.commitment.manifest.ManifestScanner;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Map;
 import java.util.OptionalLong;
 import java.util.TreeMap;
 import java.util.UUID;
@@ -124,9 +126,45 @@ class WorldGateTest {
 		assertTrue(failed.reason().contains("can't open the lock"), failed.reason());
 	}
 
+	@Test
+	void theCommittedHardcoreFlagOpens() throws IOException {
+		Files.write(env.worldDir().resolve(WorldSeed.LEVEL_DAT), WorldSeedTest.fixture("26.3-level.dat"));
+		commit(OptionalLong.empty(), new TreeMap<>(Map.of(WorldSettings.HARDCORE, "false")));
+		assertInstanceOf(WorldGate.Verdict.Open.class, WorldGate.evaluate(env, store, NEVER));
+	}
+
+	@Test
+	void aChangedHardcoreFlagLocksTheWorldAndIsNamedFirst() throws IOException {
+		Files.write(env.worldDir().resolve(WorldSeed.LEVEL_DAT), WorldSeedTest.fixture("1.21.11-level.dat"));
+		commit(OptionalLong.empty(), new TreeMap<>(Map.of(WorldSettings.HARDCORE, "false")));
+		Files.write(env.worldDir().resolve(WorldSeed.LEVEL_DAT), WorldSeedTest.withHardcore(WorldSeedTest.fixture("1.21.11-level.dat"), true));
+		Files.writeString(env.gameDir().resolve("config/mod.json"), "{\"a\":2}");
+		WorldGate.Verdict.Locked locked = assertInstanceOf(WorldGate.Verdict.Locked.class, WorldGate.evaluate(env, store, NEVER));
+		assertEquals("Hardcore changed since /commit (was off, now on)", locked.changes().getFirst());
+		assertTrue(locked.changes().stream().anyMatch(l -> l.contains("config/mod.json")), locked.changes().toString());
+	}
+
+	@Test
+	void aLevelDatThatCantBeReadKeepsAHardcoreLockedWorldShut() throws IOException {
+		commit(OptionalLong.empty(), new TreeMap<>(Map.of(WorldSettings.HARDCORE, "true")));
+		WorldGate.Verdict.Failed failed = assertInstanceOf(WorldGate.Verdict.Failed.class, WorldGate.evaluate(env, store, NEVER));
+		assertTrue(failed.reason().contains("can't read level.dat"), failed.reason());
+	}
+
+	@Test
+	void aRecordWithoutTheFlagDoesntReadLevelDat() throws IOException {
+		// Committed before C.6, or a damaged record rebuilt empty: no level.dat here, and the world still opens.
+		commit(OptionalLong.empty());
+		assertInstanceOf(WorldGate.Verdict.Open.class, WorldGate.evaluate(env, store, NEVER));
+	}
+
 	/** Commits the world as it is now, with an unlock timer started at {@code requestedAt} when given. */
 	private void commit(OptionalLong requestedAt) throws IOException {
-		LockRecord record = LockRecord.committed(ID, 0, "World", 1L, ManifestScanner.scan(env), new TreeMap<>())
+		commit(requestedAt, new TreeMap<>());
+	}
+
+	private void commit(OptionalLong requestedAt, TreeMap<String, String> settings) throws IOException {
+		LockRecord record = LockRecord.committed(ID, 0, "World", 1L, ManifestScanner.scan(env), settings)
 				.withUnlockRequestedAt(requestedAt);
 		store.create(env.worldDir(), record);
 		GuardPack.write(env.worldDir(), ID);

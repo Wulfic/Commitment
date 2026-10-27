@@ -17,7 +17,10 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.Map;
 import java.util.OptionalLong;
+import java.util.SortedMap;
+import java.util.TreeMap;
 import java.util.UUID;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.BeforeEach;
@@ -35,6 +38,9 @@ class CommitActionsTest {
 	};
 	private static final TrustedClock ONLINE = () -> new TrustedClock.Reading.At(NOW);
 	private static final TrustedClock OFFLINE = () -> new TrustedClock.Reading.Unavailable("offline");
+	/** What the server thread snapshots at /commit confirm (SettingsLock), as the record keeps it. */
+	private static final SortedMap<String, String> SETTINGS = new TreeMap<>(Map.of(
+			"difficulty", "hard", "gamerule/minecraft:keep_inventory", "false"));
 
 	@TempDir
 	Path dir;
@@ -71,11 +77,19 @@ class CommitActionsTest {
 		CommitActions.Reply reply = commit();
 		assertEquals(List.of("Commitment: world committed (1 mod, 0 resource packs, 1 config file)"), reply.lines());
 		assertEquals(CommitActions.Effect.COMMITTED, reply.effect());
+		assertEquals(SETTINGS, reply.settings(), "the server holds what was locked");
 		assertTrue(Files.isRegularFile(env.worldDir().resolve(LockStore.WORLD_RECORD)));
 		assertEquals(ID, GuardPack.read(env.worldDir()).orElseThrow());
 		assertTrue(Files.isRegularFile(mirrors.resolve(ID + ".dat")));
 		// The same setup the gate will scan at the next open: what /commit locked must open.
 		assertInstanceOf(WorldGate.Verdict.Open.class, WorldGate.evaluate(env, store, NEVER));
+	}
+
+	@Test
+	void theRecordKeepsTheGameSettingsSnapshottedAtConfirm() throws IOException {
+		commit();
+		LockRecord record = ((LockStore.Loaded.Locked) store.load(env.worldDir(), GuardPack.read(env.worldDir()), OptionalLong.of(SEED))).record();
+		assertEquals(SETTINGS, record.worldSettings());
 	}
 
 	@Test
@@ -90,7 +104,7 @@ class CommitActionsTest {
 	void aSecondCommitIsRefusedAndTheLockIsUntouched() throws IOException {
 		commit();
 		byte[] before = Files.readAllBytes(env.worldDir().resolve(LockStore.WORLD_RECORD));
-		CommitActions.Reply again = CommitActions.commit(env, store, SEED, UUID::randomUUID, NOW);
+		CommitActions.Reply again = CommitActions.commit(env, store, SEED, SETTINGS, UUID::randomUUID, NOW);
 		assertTrue(again.failure());
 		assertEquals(List.of(CommitActions.ALREADY_COMMITTED), again.lines());
 		assertEquals(CommitActions.Effect.NONE, again.effect());
@@ -187,7 +201,7 @@ class CommitActionsTest {
 	}
 
 	private CommitActions.Reply commit() throws IOException {
-		return CommitActions.commit(env, store, SEED, () -> ID, NOW);
+		return CommitActions.commit(env, store, SEED, SETTINGS, () -> ID, NOW);
 	}
 
 	private LockRecord record() throws IOException {

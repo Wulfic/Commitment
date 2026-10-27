@@ -4,7 +4,7 @@
 > cheap to read at the start of every session. History belongs in `decisions.md` and
 > `gotchas.md`; this file only answers "where am I right now?".
 
-**Last updated:** 2026-10-26 (session 8: C.3c, C.4, C.5 committed; C.6 next)
+**Last updated:** 2026-10-26 (session 8: C.3c-C.6 committed; push Stage C next)
 **Branch:** `main`, always (decisions.md 2026-10-21). Push each green stage (owner, 2026-10-21).
 
 ## Where we are
@@ -16,14 +16,16 @@
 - Owner rulings in decisions.md, incl. session 7: E.1 runs the 1.21.11 copy as a Loom dev client, 26.x on premade
   Modrinth packs.
 
-## Next: C.6, world settings reverted live (TODO.md C.6: facts first from each node's jar); then push Stage C
-- C.5 done: locked-config on all ten pairs, Proof 4 (`vanilla-guard-smoke.sh`) on all four nodes.
-- Owner, session 8: guard-pack.txt renamed to guard-live.txt; Claude picks the E.1 Modrinth packs (decisions.md).
-- Noted: "Deprecated Gradle features" comes from a task at execution time; find which before Gradle 10.
+## Next: push Stage C (C.0-C.6 committed), then Stage D (tamper matrix)
+- C.6 done (TODO.md): settings snapshot at `/commit confirm`, held every 20 ticks + at start, hardcore at open.
+  Session 8 rulings in decisions.md 2026-10-26 (LAN guests locked; player gamemode held on cheats-off integrated).
+- D.1 has the row "edit difficulty/game rules in level.dat with the mod removed, reinstall -> put back at open".
+- Untested: SettingsLock/CommitmentServer catch blocks around the tick check (TODO C.6).
 
 ## How to run things
 - Build: `./gradlew build` (all 13 nodes with 1.21.11; Fabric's `check` includes `runGameTest`). Read counts from
   `*/versions/*/build/test-results/test/*.xml`, not the exit code.
+- Settings revert smoke: `commit-smoke.sh scripts/checks/commit-flow.txt scripts/checks/rules-revert.txt`.
 - Dev server: `LOADER=<fabric|neoforge|forge> NODE=<1.21.11 (fabric only)|26.1.2|26.2|26.3> scripts/dev-server-smoke.sh scripts/checks/boot.txt`.
   Port **25571**, run dirs `run/<loader>/<node>/server`. `--self-test` checks the verdict (23 cases + world-audit + commit-smoke). `@reject` = must not match, `@exits-nonzero` = a refusal, `@gradle <arg>`, `@wait <re>` = hold until the reply is logged.
 - Client check: `./gradlew :fabric:<node>:runClientGameTest` opens a game window; look for `client world check: PASS`
