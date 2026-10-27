@@ -371,3 +371,20 @@ assigned to `MinecraftServer`).
 **Fix:** the GameTest mods test `System.getProperty(PackDriver.PROPERTY)`: a compile-time constant, so PackDriver is
 never loaded outside a pack run. The full build's Forge GameTests are the proof (red before, green after).
 **Affects:** forge|neoforge/src/gametest/.../*GameTests.java
+
+## 2026-10-27 — A Forge client on the gametest classpath loads our GameTests' datapack: the world turns "experimental"
+**Symptom:** Forge 26.3 pack run sat on vanilla's `BackupConfirmScreen` for 5 min; the log before it: `Found new data
+pack commitment_gametest:test_instances, loading it automatically`.
+**Cause:** ForgeGradle enables GameTests for runs on the gametest source set, so ForgeGameTests registered its
+test-instance pack; vanilla then calls the world's settings experimental and asks for a backup at open.
+**Fix:** in a pack run (`-Dcommitment.packDriver`), the NeoForge and Forge GameTest mods wire the driver and return
+before any GameTest registration. The driver never presses a backup or experimental prompt: one is a finding.
+**Affects:** forge|neoforge/src/gametest/.../*GameTests.java
+
+## 2026-10-27 — Every NeoForge/Forge pack asks for an older loader than Commitment's floor (the dev pin)
+**Finding:** neoforge.mods.toml / mods.toml require `[<dev pin>,)`; Modrinth's packs ask for NeoForge 26.1.2.74,
+26.2.0.88, 26.3.0.51-beta and Forge 64.0.8, 66.0.4 (pins: .122, .93, .95, 64.1.5, 66.1.0). A player must update the
+loader to add Commitment. On NeoForge 26.3 that update breaks the pack's Sodium 0.9.2 (`LevelExtractorMixin` targets a
+NeoForge-patched signature that changed); Sodium 0.9.3-beta.1 is the player's next step, done with `pack-fetch.py swap`.
+**Open:** whether F lowers the floor (needs a build or a boot on the lower loader). Raised with the owner.
+**Affects:** neoforge|forge mods.toml floors, TODO E.1 runs, Stage F

@@ -1206,6 +1206,17 @@ NeoForge and Forge first** (step C.0), so Proof 2 runs on all nine loader × nod
       `client-locked-smoke.sh` neoforge 26.3 exit 0, `Commitment:   The lock record was damaged or deleted, ...`.
       Installed (pack.txt each): all 9 Modrinth packs above; the dev pins are a patch or more newer than each pack asks
       for. Prism copy: `bash scripts/pack-copy-instance.sh` exit 0, 81 mods + 305 config files, 409 files hash-verified.
+      **Forge 26.3 / Fastly Optimised b-26.3 (11 mods, 9 config files):** run 1 stuck on vanilla's BackupConfirmScreen
+      (our GameTests' datapack loaded in the pack client → world "experimental") → pack runs skip GameTest
+      registration; run 2 still stuck: an empty Forge 26.3 pack (`run/packs/26.3/forge-empty`, PHASES=commit) passed,
+      so one of the pack's mods makes the world experimental, which Forge asks about once per world → the driver
+      proceeds without a backup on the commit launch only. **Run 3 exit 0**, commit + 4 reopens matched, audit clean.
+      **NeoForge 26.3 / Optimized fps 4.4.0 beta 1 (27 mods, 21 config files):** run 1 crash at start: Sodium 0.9.2's
+      `LevelExtractorMixin` doesn't fit NeoForge 26.3.0.95 (the pack asks for 26.3.0.51-beta, below Commitment's floor)
+      → `pack-fetch.py swap` to Sodium 0.9.3-beta.1 (`SS023RVV`); run 2: Reese's Sodium Options 2.2.5 pins Sodium 0.9.2
+      → swapped to 2.2.6-beta.1 (`S9MvJoF5`); run 3 stuck on NeoForge's warnings screen (11 mods' deprecated `logoFile`,
+      every launch) → the driver presses Continue when there are no errors. **Run 4 exit 0**, commit + 4 reopens
+      matched, audit clean. Full build after: green, 296 ×4, 12 ×4, GameTests 10/10 pairs.
       - [ ] E.1f NeoForge's way back: a dev-server check: committed world, `config/` moved away, boot an **uncommitted**
             world once (`--world`), then the committed world opens. If the uncommitted boot doesn't write the file,
             the threat table says so instead.
