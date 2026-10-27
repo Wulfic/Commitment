@@ -112,7 +112,7 @@ The player owns every file, so this is friction, not security. Each row is a Sta
 |---|---|
 | Delete or disable Commitment | The world opens, but the guard pack blinds and freezes the player with "reinstall Commitment". Nothing gets damaged |
 | Reinstall Commitment | The lock is back, and the timer state too |
-| Delete or edit `config/` | No lock state lives there, but it's part of the committed setup. Fabric, Quilt and Forge write their config files again before the check, so the world opens. NeoForge writes its server-side file (`neoforge-server.toml`, `neoforge-synced.toml` on 26.3) only later, so the world is refused ("Config removed") until `config/` is put back or the 24 h unlock runs out. An edited file is refused on every loader |
+| Delete or edit `config/` | No lock state lives there, but it's part of the committed setup. Fabric, Quilt and Forge write their config files again before the check, so the world opens. NeoForge writes its server-side file (`neoforge-server.toml`, `neoforge-synced.toml` on 26.3) only later, so the world is refused ("Config removed") until `config/` is put back, any other world is opened once (NeoForge then writes the file again; E.1f), or the 24 h unlock runs out. An edited file is refused on every loader |
 | Delete the guard datapack, mod present | The mod rebuilds it from the record at the next server start |
 | Delete the world's lock record, mod present | Restored from the mirror (matched by the lock id in the guard pack, or by seed + folder name) |
 | Hand-edit the lock record | HMAC fails, so that copy counts as damaged and the mirror's valid copy is written back. Edit **both** copies: treated as tampered, locked, and the only way out is the 24 h timer |
@@ -1165,7 +1165,7 @@ NeoForge and Forge first** (step C.0), so Proof 2 runs on all nine loader × nod
       | 26.2 | Fabulously Optimized 14.1.1 (`uQxD0ENB`) | Optimized fps 4.3.0 (`kdmJOWvh`) | Fastly Optimised b-26.2 (`UGnfzt2p`) |
       | 26.3 | Fabulously Optimized 15.0.0-beta.2 (`Wo44jriL`) | Optimized fps 4.4.0 (`UTCVjkus`) | Fastly Optimised b-26.3 (`yATWpNhp`) |
 
-      - [ ] E.1a Pack driver + `packClient` run. `fabric/src/gametest/.../PackDriver.java` (loader-free: Minecraft
+      - [x] E.1a Pack driver + `packClient` run. `fabric/src/gametest/.../PackDriver.java` (loader-free: Minecraft
             client classes only), wired by a client tick hook per loader (Fabric `ClientTickEvents`, NeoForge and
             Forge in their GameTest mods). Inert unless `-Dcommitment.packDriver=commit|reopen`. In a world for 100
             ticks → `commit`: `/commit`, 40 ticks, `/commit confirm`, 100 ticks, stop; `reopen`: 200 ticks, stop. Logs
@@ -1173,14 +1173,14 @@ NeoForge and Forge first** (step C.0), so Proof 2 runs on all nine loader × nod
             world (so a mod's first-launch screen holding Quick Play shows in the log). A run per loader:
             `:<loader>:<node>:runPackClient -Pcommitment.packDir=<dir>` (game dir `<dir>/game`, mirror `<dir>/mirror`,
             loads commitment + the GameTest mod). The Fabric hook class stays out of NeoForge/Forge's swapped copy.
-      - [ ] E.1b Pack install. `scripts/pack-fetch.py <version id> <dir>` (stdlib only, `python -I`): the mrpack and
+      - [x] E.1b Pack install. `scripts/pack-fetch.py <version id> <dir>` (stdlib only, `python -I`): the mrpack and
             each client file checked against Modrinth's sha512, overrides + client-overrides unpacked, into
             `run/packs/<node>/<loader>-<slug>/game`; refuses a dir that exists. Leaves out the jars the dev run
             already has (Fabric API, the loader), and writes `pack.txt` (version id, every file and hash, what was left
             out and why). `scripts/pack-copy-instance.sh`: **read-only** copy of the Prism instance's `mods/` (minus
             Fabric API), `config/`, `defaultconfigs/`, `resourcepacks/`, `shaderpacks/`, `options.txt` into
             `run/packs/1.21.11/fabric-prism/game`, then a hash compare source vs copy. Never writes under Prism.
-      - [ ] E.1c `scripts/pack-smoke.sh` (`LOADER NODE PACK=<dir>`): copies the node's dev world into
+      - [x] E.1c `scripts/pack-smoke.sh` (`LOADER NODE PACK=<dir>`): copies the node's dev world into
             `<pack>/game/saves/commitment-pack-smoke` (marker file), sets `onboardAccessibility:false`, launches commit +
             3 reopens, then edits video/audio keys of `options.txt` (render distance, gamma, master volume), the
             pack's Sodium options and Iris shader choice where present, and reopens a 4th time. Per launch: world
@@ -1188,10 +1188,10 @@ NeoForge and Forge first** (step C.0), so Proof 2 runs on all nine loader × nod
             driver; on a timeout, the one game JVM it started (by command line, never by name) gets `CloseMainWindow`,
             then exit 2. Exit 0 proven · 1 a diff or a Commitment error · 2 nothing proven. Cleanup (on 0 only): the
             marked world copy and this lock's mirror. `--self-test`: the cleanup's guards on scratch dirs.
-      - [ ] E.1d Run every pair (background, one at a time). Each diff line → `Exclusions.IGNORED` (changes by itself)
+      - [x] E.1d Run every pair (background, one at a time). Each diff line → `Exclusions.IGNORED` (changes by itself)
             or `NEVER_LOCKED` (video/audio/shader), a case per entry in `ExclusionsTest`, rerun until exit 0. A file
             that changes and is real setup (a gameplay config rewritten at boot) is a design question, stop and ask.
-      - [ ] E.1e Every run recorded here (pair, command, exit, matched lines, launch times for E.2).
+      - [x] E.1e Every run recorded here (pair, command, exit, matched lines, launch times for E.2).
       **Runs (session 10).** Fabric 26.3 / Fabulously Optimized 15.0.0-beta.2 (148 mods, 3 resource packs, 107 config
       files): run 1 exit 1, `/commit` failed reading `config/controlify/profile-1.lock` (held locked by Controlify while
       the game runs) → `*.lock` in `Exclusions.IGNORED` (ExclusionsTest 23 → 29 per common node; mutation red). Run 2
@@ -1226,9 +1226,22 @@ NeoForge and Forge first** (step C.0), so Proof 2 runs on all nine loader × nod
       dev-only mixin crashed the dev client → `mixin.devenv=false` in that pack (pack.txt); **exit 0**. forge 26.1.2
       exit 2: World No Particles' `@OnlyIn`, refused by Forge 64.1.5 → `pack-fetch.py drop` (leaf mod); **exit 0**.
       **All 9 Modrinth pairs exit 0.** Full build after: green, common 301 ×4, fabric 12 ×4, GameTests 10/10 pairs.
-      - [ ] E.1f NeoForge's way back: a dev-server check: committed world, `config/` moved away, boot an **uncommitted**
+      **1.21.11 / the Prism copy (Fabric dev client):** run 1 exit 1: Essential crashed the dev client at start (its
+      runtime-remapped `UtilitiesKt` gets a duplicate `width`; dev only) → `pack-fetch.py drop` (nothing depends on it;
+      account mods are out of scope). Run 2 exit 1, committed (175 mods, 7 resource packs, 299 config files) but the
+      world audit named mcMMO's, Voxy's and Xaero's own world data → `AUDIT_ALLOW='^(mcmmo|voxy)(/.*)?$
+      ^xaeromap\.txt$'` (other mods' data, not Commitment's). **Run 3 exit 0**, commit + 4 reopens matched, audit clean
+      with those allowed. **All 10 pairs exit 0** (C.2b bullet 3's zero-diff runs: done here).
+      - [x] E.1f NeoForge's way back: a dev-server check: committed world, `config/` moved away, boot an **uncommitted**
             world once (`--world`), then the committed world opens. If the uncommitted boot doesn't write the file,
             the threat table says so instead.
+            **Done, session 10:** `LOADER=neoforge NODE=<n> bash scripts/commit-smoke.sh scripts/checks/e1f/*.txt` exit 0
+            on 26.3, 26.2 and 26.1.2: boot 2 `Preparing level "commitment-e1f-other"` + `Done (` with config/ moved away
+            (`-Pcommitment.world` → `--world`, server.properties untouched; the extra world in a marked dir,
+            `scripts/other-world.sh`, removed after; self-test 5 cases, lock-check mutation red); boot 3 `Commitment: world
+            is committed and its setup matches`, no `Config removed|added|changed`. The original config/ went back after
+            boot 3 (backup entry stamped after boot 3's `Done`, e.g. 19:30:28 vs 19:30:24 on 26.3), so boot 3 ran on the
+            regenerated files. Threat table updated.
       **Not doing:** Quilt; NeoForge/Forge on 1.21.11; multiplayer; any mod's account features (Essential, offline dev
       account); fixing other mods that won't run in a dev environment (reported here, pack run without them only if
       they're leaf mods, noted per pair); the owner's saves (dev world copies only).
