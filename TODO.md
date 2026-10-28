@@ -1265,7 +1265,7 @@ NeoForge and Forge first** (step C.0), so Proof 2 runs on all nine loader × nod
 **Owner, session 11 (decisions.md 2026-10-28):** lower the NeoForge/Forge loader floor; publish a GitHub Release only
 (`gh release create`, the 13 jars); version **1.0.0**.
 
-- [ ] F.0 **Loader floor below the dev pin.** Facts (maven-metadata.xml of maven.neoforged.net and
+- [x] F.0 **Loader floor below the dev pin.** Facts (maven-metadata.xml of maven.neoforged.net and
       maven.minecraftforge.net, 2026-10-28): NeoForge's first stable builds are 26.1.2.71, 26.2.0.57, 26.3.0.76 (betas
       before); Forge's lines start at 64.0.0, 65.0.0, 66.0.0. E.1's packs ask for NeoForge 26.1.2.74, 26.2.0.88,
       26.3.0.51-beta and Forge 64.0.8, 65.1.5, 66.0.4. Fabric needs nothing (every pack asks for loader 0.19.5).
