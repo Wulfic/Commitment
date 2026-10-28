@@ -4,10 +4,10 @@ import com.wulfic.commitment.Commitment;
 import com.wulfic.commitment.client.ClientGameDir;
 import com.wulfic.commitment.gate.ServerGate;
 import com.wulfic.commitment.lock.GuardPack;
+import com.wulfic.commitment.lock.HeldSettings;
 import com.wulfic.commitment.lock.LockStore;
 import com.wulfic.commitment.lock.MirrorDir;
 import com.wulfic.commitment.lock.WorldLock;
-import com.wulfic.commitment.lock.WorldSettings;
 import com.wulfic.commitment.manifest.GameEnvironment;
 import com.wulfic.commitment.platform.Platform;
 import java.io.IOException;
@@ -40,12 +40,9 @@ public final class CommitmentServer {
 	/** Servers whose world needs the heartbeat. Weak, so a stopped integrated server isn't kept alive by this. */
 	private static final Map<MinecraftServer, Boolean> BEATING = Collections.synchronizedMap(new WeakHashMap<>());
 	/** The committed game settings each committed world's server puts back. */
-	private static final Map<MinecraftServer, Held> HELD = Collections.synchronizedMap(new WeakHashMap<>());
+	private static final HeldSettings<MinecraftServer> HELD = new HeldSettings<>();
 	/** How often the settings are checked: once a second. */
 	public static final int CHECK_TICKS = 20;
-
-	private record Held(SortedMap<String, String> settings, WorldSettings.Throttle throttle) {
-	}
 
 	private CommitmentServer() {
 	}
@@ -99,7 +96,7 @@ public final class CommitmentServer {
 
 	public static void stopped(MinecraftServer server) {
 		BEATING.remove(server);
-		HELD.remove(server);
+		HELD.release(server);
 	}
 
 	/** Every server tick, after the world and the functions have ticked. */
@@ -122,32 +119,19 @@ public final class CommitmentServer {
 			Commitment.LOGGER.info("Commitment: world {} has no committed game settings; none are held", worldDir(server).getFileName());
 			return;
 		}
-		HELD.put(server, new Held(settings, new WorldSettings.Throttle()));
+		HELD.hold(server, settings);
 		Commitment.LOGGER.info("Commitment: holding {} committed game settings in world {}", settings.size(), worldDir(server).getFileName());
 		checkSettings(server);
 	}
 
 	/** Whether this server puts committed game settings back. */
 	public static boolean holding(MinecraftServer server) {
-		return HELD.containsKey(server);
+		return HELD.holding(server);
 	}
 
-	/**
-	 * Runs inside the server tick, so nothing may escape it: a world that crashes every second is worse than one whose
-	 * settings go unheld until the next start, which is what happens, logged, if the settings can't even be read.
-	 */
+	/** Puts back what the server holds; nothing escapes into the tick ({@link HeldSettings#check}). */
 	private static void checkSettings(MinecraftServer server) {
-		Held held = HELD.get(server);
-		if (held == null) {
-			return;
-		}
-		try {
-			SettingsLock.check(server, held.settings(), held.throttle());
-		} catch (RuntimeException e) {
-			HELD.remove(server);
-			Commitment.LOGGER.error("Commitment: can't read the game settings of world {}; they aren't held until the next start",
-					worldDir(server).getFileName(), e);
-		}
+		HELD.check(server, worldDir(server).getFileName().toString(), held -> SettingsLock.check(server, held.settings(), held.throttle()));
 	}
 
 	/**

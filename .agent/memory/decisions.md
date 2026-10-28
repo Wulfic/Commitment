@@ -516,3 +516,14 @@ are rewritten per run (`scripts/prism-smoke.sh`). The 26.1.2 / 26.2 / 26.3 Fabri
 **Rejected:** The Loom swap (recompiled jar, build.gradle change, a rebuild before release). Both (more code, the
 GameTest's extra checks already ran at the pin).
 **Affects:** TODO F.2 steps 3-4, scripts/prism-smoke.sh, the owner's Prism data dir (one instance)
+
+## 2026-10-28 — Release 1.0.0: C.6's catches tested first, published directly, 10 mod jars
+**Context:** Session 14: F.2 left everything ready for the release go, with C.6's two tick-path catches untested
+(state.md). Any code change voids the release gate, which costs hours of game windows to rerun.
+**Choice:** Owner: test the catches first (F.3), rerun the whole gate (F.4), then publish the GitHub Release directly
+(no draft) with the 10 mod jars (4 Fabric, 3 NeoForge, 3 Forge), not the `-sources` jars; remove the
+`commitment-smoke` Prism instance after the gate's Prism runs. The "13 jars" of the Stage F entry above was wrong:
+the 4 `common` jars aren't mods.
+**Why:** The owner wants every error path tested before 1.0.0 ships, and pays for the rerun.
+**Rejected:** Shipping the proven jars and testing C.6 in 1.0.1. A draft release to check first. Sources jars.
+**Affects:** TODO F.3-F.5, SettingsLock, CommitmentServer, WorldSettings, new lock/HeldSettings

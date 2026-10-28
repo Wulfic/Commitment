@@ -69,19 +69,8 @@ public final class SettingsLock {
 	 * {@link WorldSettings.Throttle#WINDOW_TICKS}). Returns how many it put back.
 	 */
 	public static int check(MinecraftServer server, SortedMap<String, String> committed, WorldSettings.Throttle throttle) {
-		List<WorldSettings.Revert> reverts = WorldSettings.reverts(committed, current(server));
-		int done = 0;
-		for (WorldSettings.Revert revert : reverts) {
-			try {
-				if (!apply(server, revert)) {
-					continue;
-				}
-			} catch (RuntimeException e) {
-				// One setting that can't be set (another mod's rule, say) mustn't stop the others, or the server.
-				Commitment.LOGGER.error("Commitment: putting back {} to {} failed; left as it is", revert.name(), revert.committed(), e);
-				continue;
-			}
-			done++;
+		List<WorldSettings.Revert> done = WorldSettings.putBack(WorldSettings.reverts(committed, current(server)), revert -> apply(server, revert));
+		for (WorldSettings.Revert revert : done) {
 			Commitment.LOGGER.info("Commitment: put back {}: {} -> {}", revert.name(), revert.current(), revert.committed());
 			if (throttle.allow(revert.name(), server.getTickCount())) {
 				String message = WorldSettings.message(revert.name());
@@ -89,7 +78,7 @@ public final class SettingsLock {
 				server.getPlayerList().broadcastSystemMessage(Component.literal(message), false);
 			}
 		}
-		return done;
+		return done.size();
 	}
 
 	/** Sets one setting back. A committed value this version can't read is logged and left, never guessed at. */

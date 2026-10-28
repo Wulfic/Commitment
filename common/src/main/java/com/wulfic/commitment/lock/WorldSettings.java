@@ -1,5 +1,6 @@
 package com.wulfic.commitment.lock;
 
+import com.wulfic.commitment.Commitment;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -82,6 +83,30 @@ public final class WorldSettings {
 			}
 		});
 		return reverts;
+	}
+
+	/** Sets one setting back on the server. False when it was left as it is (the setter logs why). */
+	@FunctionalInterface
+	public interface Setter {
+		boolean set(Revert revert);
+	}
+
+	/**
+	 * Puts back each revert through {@code setter}, in order, and returns the ones it put back. One that throws (another
+	 * mod's rule, say) is logged and left as it is: it mustn't stop the others, or the server.
+	 */
+	public static List<Revert> putBack(List<Revert> reverts, Setter setter) {
+		List<Revert> done = new ArrayList<>();
+		for (Revert revert : reverts) {
+			try {
+				if (setter.set(revert)) {
+					done.add(revert);
+				}
+			} catch (RuntimeException e) {
+				Commitment.LOGGER.error("Commitment: putting back {} to {} failed; left as it is", revert.name(), revert.committed(), e);
+			}
+		}
+		return done;
 	}
 
 	/** What the players are told when {@code name} was put back. */

@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
@@ -139,5 +140,29 @@ class WorldSettingsTest {
 		WorldSettings.Throttle throttle = new WorldSettings.Throttle();
 		assertTrue(throttle.allow(WorldSettings.gamemode(HOST), 0));
 		assertFalse(throttle.allow(WorldSettings.gamemode(GUEST), 1), "one 'gamemode is locked' line, not one per player");
+	}
+
+	@Test
+	void aSettingThatThrowsDoesntStopTheOthers() {
+		WorldSettings.Revert broken = new WorldSettings.Revert(WorldSettings.gamerule("othermod:rule"), "1", "2");
+		WorldSettings.Revert difficulty = new WorldSettings.Revert(WorldSettings.DIFFICULTY, "hard", "easy");
+		WorldSettings.Revert gamemode = new WorldSettings.Revert(WorldSettings.DEFAULT_GAMEMODE, "survival", "creative");
+		List<WorldSettings.Revert> set = new ArrayList<>();
+		List<WorldSettings.Revert> done = WorldSettings.putBack(List.of(broken, difficulty, gamemode), revert -> {
+			if (revert == broken) {
+				throw new IllegalStateException("another mod's rule refused the value");
+			}
+			set.add(revert);
+			return true;
+		});
+		assertEquals(List.of(difficulty, gamemode), set, "the settings after the one that threw were still set");
+		assertEquals(List.of(difficulty, gamemode), done);
+	}
+
+	@Test
+	void aSettingLeftAsItIsIsntCountedAsPutBack() {
+		WorldSettings.Revert unreadable = new WorldSettings.Revert(WorldSettings.DIFFICULTY, "harder", "easy");
+		WorldSettings.Revert gamemode = new WorldSettings.Revert(WorldSettings.DEFAULT_GAMEMODE, "survival", "creative");
+		assertEquals(List.of(gamemode), WorldSettings.putBack(List.of(unreadable, gamemode), revert -> revert == gamemode));
 	}
 }

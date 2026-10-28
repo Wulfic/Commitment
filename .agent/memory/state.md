@@ -4,25 +4,22 @@
 > cheap to read at the start of every session. History belongs in `decisions.md` and
 > `gotchas.md`; this file only answers "where am I right now?".
 
-**Last updated:** 2026-10-28 (session 13: F.2 done; waiting for the owner's release go)
+**Last updated:** 2026-10-28 (session 14: F.3 done; F.4, the release gate rerun, next)
 **Branch:** `main`, always (decisions.md 2026-10-21). Push each green stage (owner, 2026-10-21).
 
 ## Where we are
 **Commitment**: locks a world's setup after `/commit`, with a 24-hour unlock. Plan in `TODO.md` (Tier 2).
-- Stages 0, A, B, C, D, E done. 13 nodes; common 301 JUnit per node, fabric 18, GameTests 6 on all 10 pairs.
+- Stages 0, A, B, C, D, E done. 13 nodes; common 306 JUnit per node, fabric 18, GameTests 6 on all 10 pairs.
 - E.1: ten real packs (9 Modrinth: 26.1.2/26.2/26.3 × fabric/neoforge/forge, plus the owner's Prism 1.21.11 copy) each
   committed and reopened 4× as dev clients, exit 0. Findings fixed: `*.lock`, Crash Assistant localization (IGNORED),
   `languagereload.json` (NEVER_LOCKED), the client logs each locked change. E.1f: NeoForge's way back after a deleted
   `config/` is one boot of another world. E.2: the scan is under 1 s on 175 mods.
 
 ## Next
-1. Stage F. **Owner, session 12: hold ALL pushes until the release go.** F.0, F.1, F.2 done, all local (`git log
-   origin/main..`). F.2: rung 6 green on 17 real servers, rung 5 green on 17 clients (7 via Prism: Quilt 26.1-26.3,
-   Fabric 26.1/26.1.1 with the shipped jar; owner ruling decisions.md 2026-10-28). **Stop: the owner's release go**
-   next, then the release (10 jars: 4 Fabric, 3 NeoForge, 3 Forge; GitHub Release only; CHANGELOG date at release).
-   The release gate must be rerun if any code changes before then.
-   Prism instance `commitment-smoke` (marker `.commitment-smoke`) is left in the owner's Prism: removed only on their word.
-- Untested: SettingsLock/CommitmentServer catch blocks around the tick check (TODO C.6).
+1. Stage F. **Owner, session 14 (decisions.md 2026-10-28): release go given**, after F.3 (C.6's catches tested: done)
+   and F.4 (the whole release gate rerun on F.3's jars: F.2's 17 servers + 17 clients, F.0's 6 floor servers). Then
+   F.5: publish the GitHub Release directly, 10 mod jars, no sources; then remove Prism's `commitment-smoke` instance
+   (marker `.commitment-smoke`). **Pushes still held until F.5.** Stop after each of F.3, F.4, F.5 for the owner.
 
 ## How to run things
 - Build: `./gradlew build` (all 13 nodes with 1.21.11; Fabric's `check` includes `runGameTest`). Read counts from

@@ -1437,6 +1437,50 @@ unattended straight after F.1 (game windows open on the desktop); stop after F.2
       **Rollback:** `git revert` of the F.2 commits; `rm -r run/real/<loader>/<node>/<mc>` after `ls`; the Prism
       instance folder is deleted only on the owner's word, after `ls` shows it's the one this created (marker file).
 
+**Owner, session 14 (decisions.md 2026-10-28):** test C.6's two catches first, then rerun the release gate, then
+release: published directly (no draft), the 10 mod jars only (no `-sources`), then remove the `commitment-smoke` Prism
+instance. Stop after each of F.3, F.4, F.5.
+
+- [x] F.3 **C.6's catches get tests.** **Done, session 14.** Red first (no `putBack`, no `HeldSettings`: compile
+      red). Rung 1: `./gradlew :common:<n>:test` ×4 exit 0, **306** per node (301 + 2 WorldSettingsTest + 3
+      HeldSettingsTest), 0 failed. Mutations on 26.3, each exit 1 on its own test and restored (`cmp`): `putBack`'s
+      catch → `catch (Error e)` (`aSettingThatThrowsDoesntStopTheOthers` red); `HeldSettings.check`'s the same, and its
+      `held.remove` dropped (`aCheckThatThrowsEndsTheHoldAndNeverEscapesTheTick` red each). Rungs 1+2: `./gradlew build
+      -Pgametest_max_parallel=1` exit 0, BUILD SUCCESSFUL: common 306 ×4, fabric 18 ×4, 0 failed, `All 6 required
+      tests passed` ×10; ten 1.0.0 jars rebuilt 18:21. Rung 3: `LOADER=<l> NODE=<n> commit-smoke.sh
+      commit-flow.txt rules-revert.txt` **exit 0 on all ten pairs**, 2 × `dev-server-smoke: PASS` each: `holding 62
+      committed` (63 on 26.3), `put back difficulty: hard -> easy`, `gamerule/minecraft:random_tick_speed: 7 -> 3`,
+      `default_gamemode: creative -> survival`; `no line matches @reject Commitment: can't put back`; each lock's
+      mirror removed by commit-smoke; the owner's `%LOCALAPPDATA%\Commitment` absent.
+      The per-setting catch in `SettingsLock.check` and the one in
+      `CommitmentServer.checkSettings` that ends the hold have none (C.6: vanilla can't be made to throw in a
+      GameTest). The pattern here is logic in MC-free classes under JUnit (`WorldSettings.reverts`, `Throttle`).
+      1. `WorldSettings.putBack(reverts, setter)`: runs each revert through a `Setter`, in order; one that throws is
+         logged (`putting back <name> to <value> failed; left as it is`) and the rest still run; returns the reverts
+         put back. `SettingsLock.check` passes `apply` as the setter and logs/throttles/broadcasts what comes back.
+      2. `lock/HeldSettings<S>`: the `HELD` map and `Held` record leave `CommitmentServer`. `check(server, world,
+         check)` runs the check; a `RuntimeException` ends the hold, logged (`can't read the game settings of world
+         ...; they aren't held until the next start`), and never escapes the tick.
+      3. JUnit, red first (the classes don't exist): `WorldSettingsTest`: a setter that throws on the first of three
+         → the other two are set and returned; one that returns false → not returned. `HeldSettingsTest`: a check
+         that throws → no exception, not held after, the next check doesn't run; one that doesn't → still held and
+         runs again; a server never held → the check doesn't run.
+      4. Mutations, each red then restored (`cmp`): `putBack`'s catch removed; `HeldSettings.check`'s catch removed;
+         its removal of the hold dropped.
+      5. Rungs 1+2: `./gradlew build -Pgametest_max_parallel=1`, counts read (common 301 → +N per node, fabric 18,
+         `All 6 required tests passed` ×10). Rung 3: `commit-smoke.sh scripts/checks/commit-flow.txt
+         scripts/checks/rules-revert.txt` on all ten pairs (the C.6 smoke: `put back difficulty: hard -> easy` etc.).
+      **Not doing:** the `IOException` catch at server start (not a tick catch; separate); log capture in tests (no
+      test here captures logs); any behaviour change.
+      **Blast radius:** two classes' internals, one new class, two test files; dev worlds of the smoke (removed by
+      commit-smoke). **Rollback:** `git revert` of the F.3 commit.
+- [ ] F.4 **Release gate again**, on F.3's 1.0.0 jars: F.2's matrix (rung 6 on 17 real servers, rung 5 on 17
+      clients) plus F.0 3(b) at the six NeoForge/Forge floors (the README claims them). Same commands as F.2/F.0,
+      results recorded here. Any exit 1 or 2 blocks F.5.
+- [ ] F.5 **Release 1.0.0.** CHANGELOG date; push `main`; tag; `gh release create` with the 10 mod jars and the
+      CHANGELOG entry as notes, published; check the release lists 10 assets with matching SHA-256. Then remove
+      `instances/commitment-smoke` from Prism (marker checked, Prism closed).
+
 **Rollback:** Planning: before the commit, `git checkout HEAD -- TODO.md .agent/memory/`;
 after it, `git revert <sha>`. Each stage is its own commits, so `git revert <sha>..<sha>` takes
 a stage back. For a world committed during development: `/unlock` and wait, or delete
