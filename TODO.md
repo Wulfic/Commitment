@@ -1262,6 +1262,44 @@ NeoForge and Forge first** (step C.0), so Proof 2 runs on all nine loader × nod
 
 ### Stage F: release (the release gate; push only on the owner's go)
 
+**Owner, session 11 (decisions.md 2026-10-28):** lower the NeoForge/Forge loader floor; publish a GitHub Release only
+(`gh release create`, the 13 jars); version **1.0.0**.
+
+- [ ] F.0 **Loader floor below the dev pin.** Facts (maven-metadata.xml of maven.neoforged.net and
+      maven.minecraftforge.net, 2026-10-28): NeoForge's first stable builds are 26.1.2.71, 26.2.0.57, 26.3.0.76 (betas
+      before); Forge's lines start at 64.0.0, 65.0.0, 66.0.0. E.1's packs ask for NeoForge 26.1.2.74, 26.2.0.88,
+      26.3.0.51-beta and Forge 64.0.8, 65.1.5, 66.0.4. Fabric needs nothing (every pack asks for loader 0.19.5).
+      **Candidates** (first, then one fallback; both red → stop and report):
+      | Pair | Pin | Candidate | Fallback |
+      |---|---|---|---|
+      | neoforge 26.1.2 | 26.1.2.122 | 26.1.2.71 | 26.1.2.74 |
+      | neoforge 26.2 | 26.2.0.93 | 26.2.0.57 | 26.2.0.88 |
+      | neoforge 26.3 | 26.3.0.95 | 26.3.0.51-beta (the pack's; below the first stable) | 26.3.0.76 |
+      | forge 26.1.2 | 64.1.5 | 64.0.0 | 64.0.8 |
+      | forge 26.2 | 65.1.5 | 65.0.0 | — (the pack asks for the pin) |
+      | forge 26.3 | 66.1.0 | 66.0.0 | 66.0.4 |
+      1. `gradle.properties`: `neoforge_floor.<node>`, `forge_floor.<node>` (dated, sourced); the mods.toml templates
+         take the floor (`neoforgeFloor`, `forgeFloor`) instead of the pin; `forgeMajor` from the floor. Fabric-side
+         JUnit `LoaderFloorTest` (reads gradle.properties and both templates, like ReadmeBandsTest): each floor ≤ its
+         pin and on the same line (Maven ordering, so `-beta` sorts below its release); the templates use the floor
+         keys. Mutation: a floor above its pin → red; the template back on `neoforgeVersion` → red.
+      2. **Real loader servers** (also F.2's rung 6): `server-jars.sh` `neoforge_server <version> <dir>` and
+         `forge_server <mc> <version> <dir>` (installer jar SHA-1 from the maven's `.sha1`, `--install-server` /
+         `--installServer`, stamp file like Quilt's; launch arguments read from what the installer writes).
+         `dev-server-smoke.sh`: `REAL=<loader version>` with `LOADER=neoforge|forge` boots the node's **built** jar on
+         that server in `run/real/<loader>/<node>/<version>/server`, `LOCALAPPDATA` → its `appdata/`. `lock-files.sh`
+         `run_root`/`mirror_dir` learn `REAL`, so `commit-smoke.sh` cleans up there. Self-test: `REAL` on fabric/1.21.11
+         refused (exit 2), the run root and mirror paths.
+      3. **Proof per pair at the floor:** (a) `./gradlew :<l>:<n>:build -P<l>_version.<n>=<floor>` exit 0: compiles and
+         the GameTests pass on the floor (counts read); (b) the pin-built jar, `REAL=<floor> commit-smoke.sh
+         commit-flow.txt locked-config.txt config-restored.txt` exit 0 (a jar still declaring the pin refuses to load
+         there: the revert check); (c) `client-locked-smoke.sh` at the floor (`GRADLE_EXTRA=-P<l>_version.<n>=<floor>`),
+         exit 0. Then `./gradlew build` at the pins (the release jars are rebuilt).
+      **Not doing:** Fabric/Quilt floors; Minecraft ranges; compiling the release against the floor; floors below
+      what's proven (no bisecting past the fallback).
+      **Blast radius:** `run/real/` (new, git-ignored; checksummed downloads, rebuilt by the script), dev world copies;
+      the `-P` builds overwrite `build/` jars, rebuilt by `./gradlew build`. **Rollback:** `git revert` of the F.0
+      commits; `rm -r run/real/<loader>/<node>/<version>` after `ls` (no lock files left: commit-smoke's cleanup).
 - [ ] F.1 README: what it does, the threat model and its honest limits, the privacy note (the
       internet time check, the OS mirror file), the band/loader table, how to get out (`/unlock`).
       `CHANGELOG.md`.

@@ -4,7 +4,7 @@
 > cheap to read at the start of every session. History belongs in `decisions.md` and
 > `gotchas.md`; this file only answers "where am I right now?".
 
-**Last updated:** 2026-10-27 (session 10 end: Stage E done)
+**Last updated:** 2026-10-28 (session 11: Stage F planned, F.0 started)
 **Branch:** `main`, always (decisions.md 2026-10-21). Push each green stage (owner, 2026-10-21).
 
 ## Where we are
@@ -16,10 +16,8 @@
   `config/` is one boot of another world. E.2: the scan is under 1 s on 175 mods.
 
 ## Next
-1. Stage F (TODO F.1, F.2): README + CHANGELOG, then the release gate on every node × loader. Push only on the owner's go.
-2. **Raise with the owner first:** Commitment's loader floor is the dev pin (`[pin,)`); every NeoForge/Forge Modrinth
-   pack asks for an older loader, and on NeoForge 26.3 updating it breaks the pack's Sodium. Lower the floor (needs a
-   boot on each lower loader) or document "update your loader"?
+1. Stage F (TODO F.0 → F.1 → F.2). Owner, session 11: lower the NeoForge/Forge floor (F.0), GitHub Release only,
+   version 1.0.0. Stop after each of F.0, F.1, F.2; release only on the owner's go.
 - Untested: SettingsLock/CommitmentServer catch blocks around the tick check (TODO C.6).
 
 ## How to run things

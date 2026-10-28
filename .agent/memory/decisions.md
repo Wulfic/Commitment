@@ -448,3 +448,19 @@ which is the rewrite E.1 hunts for.
 **Rejected:** Fabric's client GameTest (Fabric only, sets up its own client). A seam in shipped code. Ending the JVM
 by PID (no clean exit). A datapack function running `/commit` (level 2; `/commit` needs the host or level 4).
 **Affects:** TODO E.1, fabric|neoforge|forge gametest source sets and build.gradle, scripts/pack-*.
+
+## 2026-10-28 — Stage F: lower the NeoForge/Forge floor, GitHub Release only, version 1.0.0
+**Context:** E.1 found every NeoForge/Forge pack asks for an older loader than Commitment's floor (the dev pin), and
+on NeoForge 26.3 updating the loader breaks the pack's Sodium (gotchas 2026-10-27). Stage F also had to pick where a
+release goes and its number; there is no CI, so nothing publishes on a push.
+**Choice:** Owner (session 11): lower the floor to the lowest build each node is proven on, separate from the dev pin
+(`neoforge_floor.<node>`, `forge_floor.<node>`; the jar still compiles against the pin). Candidates: the lower of
+the line's first stable build and what the E.1 pack asked for (NeoForge), the line's first build (Forge); one
+fallback to the pack's own ask. Publish as a GitHub Release (`gh release create`) with the 13 jars, version 1.0.0.
+**Why:** A player adds Commitment to the pack they have; asking them to update the loader can break the pack.
+Compiling against the pin keeps every proof so far valid; the floor gets its own proofs (TODO F.0).
+**Rejected:** Keeping the pin as the floor and documenting "update your loader" (the E.1 Sodium break shows the cost).
+Compiling the release against the floor (would void Stages C–E's dev proofs). Modrinth/CurseForge now (owner's to add
+later). 0.1.0.
+**Affects:** gradle.properties, neoforge|forge mods.toml, scripts/dev-server-smoke.sh, commit-smoke.sh, server-jars.sh,
+README, TODO Stage F
