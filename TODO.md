@@ -1376,6 +1376,16 @@ unattended straight after F.1 (game windows open on the desktop); stop after F.2
          locked screen's lines, stops the game PID it started (found by command line naming the instance dir), and
          Prism's PID if it started it. Plus a plain uncommitted world copy → it opens (a world-joined line). Nodes
          26.1.2, 26.2, 26.3 and 26.1, 26.1.1.
+      **Progress, session 12 (uncommitted):** step 1's harness written (`fabric_server`, `fabric_api` with a
+      Minecraft, `REAL=<mc>` for fabric/quilt; gradle.properties `real_fabric_api.*`, `fabric_installer_version`);
+      `dev-server-smoke.sh --self-test` all passed; mutation (band check without its `.`) → red, restored (`cmp`).
+      Session 13: `fabric_api`'s widened path guard got self-test cases (7 bad paths, refused by its own message,
+      run from the self-test's temp dir); mutation (guard matching any `real/.*`) → 3 red, restored (`cmp`). The
+      first mutation run sat in the repo dir and downloaded Fabric API into three new `run/real/` trees: listed
+      (all created that minute, one jar each) and removed (gotchas 2026-10-28). **Step 2 done:** javap: MainMixin's and WorldOpenFlowsMixin's targets
+      identical on 26.1/26.1.1/26.1.2; a class-file check of every reference in the built `fabric-mc26.1` jar
+      (scratchpad `refcheck.py`) against client jar + Fabric API (0.145.1+26.1 / 0.145.4+26.1.1) + loader: same 12
+      unresolved as the 26.1.2 control, all Brigadier/DFU (libraries outside the client jar). No difference.
       5. **The matrix, at the pins, built jars of 1.0.0** (exit codes and matched lines recorded below):
          | Loader | Rung 5 (client) | Rung 6 (built jar, real server: `commit-smoke.sh commit-flow.txt locked-config.txt config-restored.txt`) |
          |---|---|---|

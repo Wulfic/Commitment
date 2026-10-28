@@ -6,13 +6,18 @@
 #   source scripts/server-jars.sh
 #   vanilla_jar 26.3 run/vanilla/26.3/server.jar        # Mojang's server jar (SHA-1 from piston-meta)
 #   quilt_server 26.3 run/quilt/26.3/server             # Quilt Loader server (installer SHA-1 from maven.quiltmc.org)
+#   fabric_server 26.1 run/real/fabric/26.1.2/26.1/server
+#                                                       # Fabric Loader server (installer SHA-1 from maven.fabricmc.net)
 #   fabric_api 26.3 run/quilt/26.3/server/mods          # Fabric API, the node's pin (SHA-1 from maven.fabricmc.net)
+#   fabric_api 26.1.2 run/real/fabric/26.1.2/26.1/server/mods 26.1
+#                                                       # Fabric API for another Minecraft of the node's band
 #   loader_server neoforge 26.3 26.3.0.51-beta run/real/neoforge/26.3/26.3.0.51-beta/server
 #                                                       # a NeoForge or Forge server (installer SHA-1 from its maven)
 
 MANIFEST=https://piston-meta.mojang.com/mc/game/version_manifest_v2.json
 QUILT_MAVEN=https://maven.quiltmc.org/repository/release/org/quiltmc/quilt-installer
 FABRIC_API_MAVEN=https://maven.fabricmc.net/net/fabricmc/fabric-api/fabric-api
+FABRIC_INSTALLER_MAVEN=https://maven.fabricmc.net/net/fabricmc/fabric-installer
 NEOFORGE_MAVEN=https://maven.neoforged.net/releases/net/neoforged/neoforge
 FORGE_MAVEN=https://maven.minecraftforge.net/net/minecraftforge/forge
 
@@ -87,16 +92,44 @@ quilt_server() {
 	echo "$stamp" > "$dir/.commitment-quilt-install"
 }
 
-# fabric_api <node> <mods dir>: the node's Fabric API pin (fabric_api_version.<node>) into <mods dir>, replacing any
-# other Fabric API jar there.
-fabric_api() {
-	local node=$1 mods=$2 version name other
-	# It removes jars: only ever in a Quilt server's mods dir under run/.
-	if [[ ! $mods =~ ^run/quilt/[0-9.]+/server/mods$ ]]; then
-		echo "server-jars: refusing to put Fabric API into '$mods': not run/quilt/<node>/server/mods" >&2
+# fabric_server <minecraft version> <dir>: Fabric Loader (gradle.properties' loader_version) installed as a server into
+# <dir>, with the vanilla server jar the installer downloads. Skipped when <dir> already holds that install.
+fabric_server() {
+	local version=$1 dir=$2 loader installer jar stamp
+	loader=$(gradle_prop loader_version) || return 1
+	installer=$(gradle_prop fabric_installer_version) || return 1
+	stamp="minecraft=$version loader=$loader installer=$installer"
+	if [[ -f $dir/fabric-server-launch.jar && -f $dir/.commitment-fabric-install && $(< "$dir/.commitment-fabric-install") == "$stamp" ]]; then
+		return 0
+	fi
+	jar=run/real/installers/fabric-installer-$installer.jar
+	fetch_checked "$FABRIC_INSTALLER_MAVEN/$installer/fabric-installer-$installer.jar" \
+		"$(curl -fsS --max-time 30 "$FABRIC_INSTALLER_MAVEN/$installer/fabric-installer-$installer.jar.sha1" | tr -d '[:space:]')" "$jar" || return 1
+	mkdir -p "$dir"
+	echo "server-jars: installing Fabric Loader $loader for Minecraft $version into $dir" >&2
+	if ! java -jar "$jar" server -dir "$dir" -mcversion "$version" -loader "$loader" -downloadMinecraft >&2; then
+		echo "server-jars: the Fabric installer failed" >&2
 		return 1
 	fi
-	version=$(gradle_prop "fabric_api_version.$node") || return 1
+	[[ -f $dir/fabric-server-launch.jar ]] || { echo "server-jars: the Fabric installer wrote no fabric-server-launch.jar" >&2; return 1; }
+	echo "$stamp" > "$dir/.commitment-fabric-install"
+}
+
+# fabric_api <node> <mods dir> [<minecraft version>]: Fabric API into <mods dir>, replacing any other Fabric API jar
+# there. The node's pin (fabric_api_version.<node>) on the node's own Minecraft; on another Minecraft of the band,
+# real_fabric_api.<minecraft>.
+fabric_api() {
+	local node=$1 mods=$2 minecraft=${3:-$1} version name other
+	# It removes jars: only ever in a Quilt or real server's mods dir under run/.
+	if [[ ! $mods =~ ^run/(quilt/[0-9.]+|real/(fabric|quilt)/[0-9.]+/[0-9.]+)/server/mods$ ]]; then
+		echo "server-jars: refusing to put Fabric API into '$mods': not run/quilt/<node>/server/mods or run/real/<fabric|quilt>/<node>/<minecraft>/server/mods" >&2
+		return 1
+	fi
+	if [[ $minecraft == "$node" ]]; then
+		version=$(gradle_prop "fabric_api_version.$node") || return 1
+	else
+		version=$(gradle_prop "real_fabric_api.$minecraft") || return 1
+	fi
 	name=fabric-api-$version.jar
 	fetch_checked "$FABRIC_API_MAVEN/${version//+/%2B}/fabric-api-${version//+/%2B}.jar" \
 		"$(curl -fsS --max-time 30 "$FABRIC_API_MAVEN/${version//+/%2B}/fabric-api-${version//+/%2B}.jar.sha1" | tr -d '[:space:]')" \

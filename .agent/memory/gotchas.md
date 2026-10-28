@@ -434,3 +434,12 @@ queue the edit for when it ends.
 `META-INF/jarjar/metadata.json`, bisected over maven-metadata.xml, not booted. Forge 64.0.0/65.0.0/66.0.0 are fine.
 **Open:** floor at the first 0.5.5 build, bundle MixinExtras, or rewrite MainMixin: owner's call (TODO F.0).
 **Affects:** common/.../mixin/MainMixin.java, gradle.properties neoforge_floor.*, TODO F.0
+
+## 2026-10-28 — Mutating a download/delete guard in a self-test that runs from the repo does real work
+**Finding:** F.2's `fabric_api` path-guard cases ran from the repo root; mutated to accept any `real/.*`, the guard let
+three bad paths through and the function downloaded Fabric API into new `run/real/x`, `run/real/neoforge/26.3/26.3.0.95`
+and `run/real/fabric/26.1.2/26.1/server` (`mods/..`). Nothing pre-existing was touched (the dirs were new); listed,
+removed by name.
+**Rule:** a guard test runs where a broken guard can't reach anything real: `cd` the self-test's temp dir, with no
+`gradle.properties`, so the function fails before any download even if the guard is gone.
+**Affects:** scripts/dev-server-smoke.sh (self_test, fabric_api cases)

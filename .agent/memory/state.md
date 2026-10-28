@@ -4,7 +4,7 @@
 > cheap to read at the start of every session. History belongs in `decisions.md` and
 > `gotchas.md`; this file only answers "where am I right now?".
 
-**Last updated:** 2026-10-28 (session 11: F.0 done)
+**Last updated:** 2026-10-28 (session 12: F.1 done, F.2 under way)
 **Branch:** `main`, always (decisions.md 2026-10-21). Push each green stage (owner, 2026-10-21).
 
 ## Where we are
@@ -16,10 +16,14 @@
   `config/` is one boot of another world. E.2: the scan is under 1 s on 175 mods.
 
 ## Next
-1. Stage F (TODO F.0 → F.1 → F.2). Owner, session 11: GitHub Release only, version 1.0.0. Stop after each of F.0,
-   F.1, F.2; release only on the owner's go. **F.0 done:** floors NeoForge 26.1.2.114 / 26.2.0.90 / 26.3.0.51-beta,
-   Forge 64.0.0 / 65.0.0 / 66.0.0 (`neoforge_floor.*`, `forge_floor.*`), each proven on a real server, a client and
-   GameTests. Next: F.1 README + CHANGELOG (floors, the MixinExtras reason), version bump to 1.0.0.
+1. Stage F. **Owner, session 12: hold ALL pushes (F.0, F.1 too: local only) until the release go.** F.0, F.1 done
+   (`a519aee`: README, CHANGELOG, version 1.0.0). **F.2 now, unattended** (TODO F.2 plan): real Fabric/Quilt servers
+   (`REAL=<minecraft>`), the Fabric 26.1 jar proven on 26.1/26.1.1 (owner: prove, not narrow), Quilt's client in a
+   NEW Prism instance `commitment-quilt-smoke` (owner OK'd; never touch the owner's instances `1.21.11`, `26.3`).
+   **Uncommitted:** step 1 harness (scripts/server-jars.sh, dev-server-smoke.sh, gradle.properties keys): self-test
+   green, mutation-checked, no real boot yet. Next: commit it, then `LOADER=fabric NODE=26.1.2 REAL=26.1
+   commit-smoke.sh commit-flow.txt locked-config.txt config-restored.txt`. Step 2 (javap/refcheck) done, clean.
+   Then stop for the release go. The release is 10 jars (4 Fabric, 3 NeoForge, 3 Forge), not 13.
 - Untested: SettingsLock/CommitmentServer catch blocks around the tick check (TODO C.6).
 
 ## How to run things

@@ -7,6 +7,9 @@
 #   LOADER=quilt NODE=26.3 scripts/dev-server-smoke.sh ...       # the built Fabric jar on a real Quilt server
 #   LOADER=neoforge NODE=26.3 REAL=26.3.0.51-beta scripts/dev-server-smoke.sh ...
 #                                                                # the built jar on a real server of that loader build
+#   LOADER=fabric NODE=26.1.2 REAL=26.1 scripts/dev-server-smoke.sh ...
+#                                                                # the built jar on a real Fabric (or Quilt) server of
+#                                                                # that Minecraft, one of the node's band
 #   scripts/dev-server-smoke.sh --self-test                      # check the verdict against synthetic logs
 #
 # Exit codes: 0 proven · 1 the mod is bad · 2 nothing proven (port busy, bad arguments, Gradle failed before the
@@ -16,7 +19,10 @@
 # the node's built Fabric jar (build it first) and Fabric API in mods/, and LOCALAPPDATA set to run/quilt/<node>/appdata
 # so the lock mirror of a released jar stays in run/ too. REAL=<loader version> (LOADER=neoforge or forge) does the same
 # on a real server of that NeoForge or Forge build, in run/real/<loader>/<node>/<version>/server, and requires the boot
-# line to name that build. @sh, @before and @after steps see RUN_ROOT (run/<loader>/<node>, or the REAL one).
+# line to name that build. With LOADER=fabric or quilt, REAL=<minecraft version> (the node's band label, or a patch of
+# it: what the jar's minecraft_range covers) runs a real Fabric or Quilt server of that Minecraft in
+# run/real/<loader>/<node>/<minecraft>/server, with Fabric API for it, and requires the boot line to name that Minecraft.
+# @sh, @before and @after steps see RUN_ROOT (run/<loader>/<node>, or the REAL one).
 #
 # Lines in the commands file:
 #   <command>          typed into the server console, after this run's "Done (" line
@@ -59,9 +65,15 @@ LAUNCHED_LINE='^\[[0-9:]+\] \[[^]]+/(INFO|WARN|ERROR|FATAL|DEBUG)\]'
 # never prints (Gradle's own "BUILD ..." line does that for runServer).
 EXITED_LINE='^dev-server-smoke: server exited [0-9]+$'
 
-# real_boot_line <loader version>: the boot line of a REAL run, naming that build ("loaded on NeoForge 26.3.0.51-beta,").
+# real_boot_line <REAL>: the boot line of a REAL run, naming that build ("loaded on NeoForge 26.3.0.51-beta,"), or on
+# Fabric and Quilt (LOADER) that Minecraft ("loaded on Fabric 0.19.5, Minecraft 26.1", and not 26.1.2).
 real_boot_line() {
-	echo "Commitment .* loaded on (NeoForge|Forge) $(sed 's/\./\\./g' <<< "$1"),"
+	local escaped
+	escaped=$(sed 's/\./\\./g' <<< "$1")
+	case ${LOADER:-} in
+		fabric | quilt) echo "Commitment .* loaded on (Fabric|Quilt) [^,]+, Minecraft $escaped[[:space:]]*$" ;;
+		*) echo "Commitment .* loaded on (NeoForge|Forge) $escaped," ;;
+	esac
 }
 
 # launched <output>: did the game's JVM run at all? No means exit 2, whatever Gradle's exit code says.
@@ -277,10 +289,22 @@ self_test() {
 	exit_check 1 "@exits-nonzero: exit 0 fails" 0 yes
 	exit_check 1 "@exits-nonzero: a timeout fails" 124 yes
 
-	# REAL: the built jar on a real NeoForge or Forge server of that build, in its own run root.
+	# REAL: the built jar on a real server of that loader build (NeoForge, Forge) or Minecraft (Fabric, Quilt), in its
+	# own run root.
 	local got pin prefix
-	got=0; LOADER=fabric REAL=0.19.5 bash "$0" > /dev/null 2>&1 || got=$?
-	if [[ $got == 2 ]]; then echo "ok   REAL on Fabric is refused (exit 2)"; else echo "FAIL REAL on Fabric is refused: exit $got"; failures=$((failures + 1)); fi
+	# By the band check itself: exit 2 alone would also be a later failure (no Fabric API for that Minecraft).
+	local band_refusal="isn't a Minecraft of node 26.1.2's band (26.1)" said case_loader case_real case_name
+	for case_ in "fabric 26.2 a Fabric REAL outside the node's band" "quilt 0.19.5 a Quilt REAL that's a loader version" \
+		"fabric 26.10 a Fabric REAL that only shares the band's prefix"; do
+		read -r case_loader case_real case_name <<< "$case_"
+		got=0; said=$(LOADER=$case_loader NODE=26.1.2 REAL=$case_real bash "$0" 2>&1 > /dev/null) || got=$?
+		if [[ $got == 2 && $said == *"$band_refusal"* ]]; then
+			echo "ok   $case_name is refused (exit 2)"
+		else
+			echo "FAIL $case_name is refused: exit $got, said: $said"
+			failures=$((failures + 1))
+		fi
+	done
 	got=0; LOADER=neoforge REAL=../../x bash "$0" > /dev/null 2>&1 || got=$?
 	if [[ $got == 2 ]]; then echo "ok   a REAL that isn't a version is refused (exit 2)"; else echo "FAIL a REAL that isn't a version is refused: exit $got"; failures=$((failures + 1)); fi
 	if [[ $(REAL=66.0.0 run_root forge 26.3) == run/real/forge/26.3/66.0.0 &&
@@ -295,15 +319,48 @@ self_test() {
 		"$done_line" > "$dir/real.log"
 	printf '%s\n' '[16:00:01] [main/INFO] (commitment) Commitment 1.0.0 loaded on NeoForge 26.3.0.95, Minecraft 26.3' \
 		"$done_line" > "$dir/real-pin.log"
-	got=0; REAL=26.3.0.51-beta verdict "$dir/real.log" > /dev/null || got=$?
-	pin=0; REAL=26.3.0.51-beta verdict "$dir/real-pin.log" > /dev/null || pin=$?
-	prefix=0; REAL=26.3.0.5 verdict "$dir/real.log" > /dev/null || prefix=$?
+	got=0; LOADER=neoforge REAL=26.3.0.51-beta verdict "$dir/real.log" > /dev/null || got=$?
+	pin=0; LOADER=neoforge REAL=26.3.0.51-beta verdict "$dir/real-pin.log" > /dev/null || pin=$?
+	prefix=0; LOADER=neoforge REAL=26.3.0.5 verdict "$dir/real.log" > /dev/null || prefix=$?
 	if [[ $got == 0 && $pin == 1 && $prefix == 1 ]]; then
 		echo "ok   a REAL run's boot line has to name that build"
 	else
 		echo "FAIL a REAL run's boot line has to name that build (got $got, pin $pin, prefix $prefix)"
 		failures=$((failures + 1))
 	fi
+	printf '%s\n' '[16:00:01] [main/INFO] (commitment) Commitment 1.0.0 loaded on Fabric 0.19.5, Minecraft 26.1' \
+		"$done_line" > "$dir/real-fabric.log"
+	printf '%s\n' '[16:00:01] [main/INFO] (commitment) Commitment 1.0.0 loaded on Fabric 0.19.5, Minecraft 26.1.2' \
+		"$done_line" > "$dir/real-fabric-pin.log"
+	got=0; LOADER=fabric REAL=26.1 verdict "$dir/real-fabric.log" > /dev/null || got=$?
+	pin=0; LOADER=fabric REAL=26.1 verdict "$dir/real-fabric-pin.log" > /dev/null || pin=$?
+	prefix=0; LOADER=quilt REAL=26.1 verdict "$dir/real-fabric.log" > /dev/null || prefix=$?
+	if [[ $got == 0 && $pin == 1 && $prefix == 0 ]]; then
+		echo "ok   a Fabric or Quilt REAL run's boot line has to name that Minecraft"
+	else
+		echo "FAIL a Fabric or Quilt REAL run's boot line has to name that Minecraft (got $got, 26.1.2 $pin, quilt $prefix)"
+		failures=$((failures + 1))
+	fi
+	if [[ $(REAL=26.1 run_root fabric 26.1.2) == run/real/fabric/26.1.2/26.1 &&
+		$(REAL=26.1 mirror_dir fabric 26.1.2) == run/real/fabric/26.1.2/26.1/appdata/Commitment/locks ]]; then
+		echo "ok   a Fabric REAL moves the run root and the mirror"
+	else
+		echo "FAIL a Fabric REAL moves the run root and the mirror"
+		failures=$((failures + 1))
+	fi
+	# fabric_api removes other Fabric API jars: only in a Quilt or real Fabric/Quilt server's mods dir. Refused before
+	# any download, by its own message. Run from $dir with no gradle.properties, so a broken guard writes nothing real.
+	local mods jars=$PWD/scripts/server-jars.sh
+	for mods in run/real/fabric/26.1.2/../../x/server/mods run/real/neoforge/26.3/26.3.0.95/server/mods \
+		run/fabric/26.3/run/mods mods "$dir/mods" run/real/fabric/26.1.2/26.1/server/mods/.. ""; do
+		said=$( (cd "$dir" && source "$jars" && fabric_api 26.1.2 "$mods" 26.1) 2>&1) && got=0 || got=$?
+		if [[ $got == 1 && $said == *"refusing to put Fabric API"* ]]; then
+			echo "ok   fabric_api refuses '$mods'"
+		else
+			echo "FAIL fabric_api refuses '$mods': exit $got, said: $said"
+			failures=$((failures + 1))
+		fi
+	done
 	rm -rf "$dir"
 	bash scripts/world-audit.sh --self-test || failures=$((failures + 1))
 	bash scripts/commit-smoke.sh --self-test || failures=$((failures + 1))
@@ -339,15 +396,19 @@ case "$LOADER" in
 		;;
 	*) echo "LOADER must be fabric, quilt, neoforge or forge, not '$LOADER'" >&2; exit 2 ;;
 esac
-# REAL names a directory under run/real: a loader version, nothing that could climb out of it.
+# REAL names a directory under run/real: a version, nothing that could climb out of it.
 if [[ -n $REAL ]]; then
-	if [[ $LOADER != neoforge && $LOADER != forge ]]; then
-		echo "REAL is for LOADER=neoforge or forge (Quilt always runs the built jar), not '$LOADER'" >&2
+	if [[ ! $REAL =~ ^[0-9]+(\.[0-9]+)+(-beta)?$ ]]; then
+		echo "REAL must be a version like 26.3.0.51-beta, 66.0.0 or 26.1, not '$REAL'" >&2
 		exit 2
 	fi
-	if [[ ! $REAL =~ ^[0-9]+(\.[0-9]+)+(-beta)?$ ]]; then
-		echo "REAL must be a loader version like 26.3.0.51-beta or 66.0.0, not '$REAL'" >&2
-		exit 2
+	# On Fabric and Quilt it's a Minecraft the jar declares: the band label or a patch of it (minecraft_range).
+	if [[ $LOADER == fabric || $LOADER == quilt ]]; then
+		label=$(grep -E "^band_label\.$(sed 's/\./\\./g' <<< "$NODE")=" gradle.properties | cut -d= -f2 | tr -d '[:space:]')
+		if [[ -z $label || ($REAL != "$label" && $REAL != "$label".*) ]]; then
+			echo "REAL=$REAL isn't a Minecraft of node $NODE's band (${label:-none}); the jar doesn't declare it" >&2
+			exit 2
+		fi
 	fi
 fi
 export RUN_ROOT
@@ -428,8 +489,8 @@ elif [[ $LOADER == quilt ]]; then
 		echo "dev-server-smoke: need exactly one built Fabric jar in fabric/versions/$NODE/build/libs (found: ${BUILT:-none}); run ./gradlew :fabric:$NODE:build" >&2
 		exit 2
 	fi
-	quilt_server "$NODE" "$RUN_DIR" || { echo "dev-server-smoke: NOTHING PROVEN (exit 2): no Quilt server" >&2; exit 2; }
-	fabric_api "$NODE" "$RUN_DIR/mods" || { echo "dev-server-smoke: NOTHING PROVEN (exit 2): no checked Fabric API" >&2; exit 2; }
+	quilt_server "${REAL:-$NODE}" "$RUN_DIR" || { echo "dev-server-smoke: NOTHING PROVEN (exit 2): no Quilt server" >&2; exit 2; }
+	fabric_api "$NODE" "$RUN_DIR/mods" "${REAL:-$NODE}" || { echo "dev-server-smoke: NOTHING PROVEN (exit 2): no checked Fabric API" >&2; exit 2; }
 	for old in "$RUN_DIR"/mods/commitment-*.jar; do
 		if [[ -e $old && $(basename "$old") != "$(basename "$BUILT")" ]]; then
 			rm -- "$old"
@@ -440,6 +501,24 @@ elif [[ $LOADER == quilt ]]; then
 	[[ -f $RUN_DIR/eula.txt ]] || echo "eula=true" > "$RUN_DIR/eula.txt"
 	mkdir -p "$RUN_ROOT/appdata"
 	JAR_ARGS=(-Xmx3G ${JVM_PROPS[@]+"${JVM_PROPS[@]}"} -jar quilt-server-launch.jar --port "$PORT" nogui)
+elif [[ $LOADER == fabric && -n $REAL ]]; then
+	JAR_DIR=$RUN_DIR
+	BUILT=$(compgen -G "fabric/versions/$NODE/build/libs/commitment-*+fabric-mc*.jar" | grep -v -- '-sources\.jar$' || true)
+	if [[ $(wc -w <<< "$BUILT") -ne 1 ]]; then
+		echo "dev-server-smoke: need exactly one built Fabric jar in fabric/versions/$NODE/build/libs (found: ${BUILT:-none}); run ./gradlew :fabric:$NODE:build" >&2
+		exit 2
+	fi
+	fabric_server "$REAL" "$RUN_DIR" || { echo "dev-server-smoke: NOTHING PROVEN (exit 2): no Fabric $REAL server" >&2; exit 2; }
+	fabric_api "$NODE" "$RUN_DIR/mods" "$REAL" || { echo "dev-server-smoke: NOTHING PROVEN (exit 2): no checked Fabric API" >&2; exit 2; }
+	for old in "$RUN_DIR"/mods/commitment-*.jar; do
+		if [[ -e $old && $(basename "$old") != "$(basename "$BUILT")" ]]; then
+			rm -- "$old"
+			echo "dev-server-smoke: removed the older $old" >&2
+		fi
+	done
+	cp -- "$BUILT" "$RUN_DIR/mods/"
+	mkdir -p "$RUN_ROOT/appdata"
+	JAR_ARGS=(-Xmx3G ${JVM_PROPS[@]+"${JVM_PROPS[@]}"} -jar fabric-server-launch.jar --port "$PORT" nogui)
 elif [[ -n $REAL ]]; then
 	JAR_DIR=$RUN_DIR
 	BUILT=$(compgen -G "$LOADER/versions/$NODE/build/libs/commitment-*+$LOADER-mc*.jar" | grep -v -- '-sources\.jar$' || true)
