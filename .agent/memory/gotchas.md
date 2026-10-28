@@ -443,3 +443,15 @@ removed by name.
 **Rule:** a guard test runs where a broken guard can't reach anything real: `cd` the self-test's temp dir, with no
 `gradle.properties`, so the function fails before any download even if the guard is gone.
 **Affects:** scripts/dev-server-smoke.sh (self_test, fabric_api cases)
+
+## 2026-10-28 — dev-server-smoke could read the last boot's "server exited" line and never send stop
+**Symptom:** F.2, `commit-smoke.sh` on the real Fabric 26.3 server: the third boot (config-restored) reached `Done (`,
+logged `heartbeat on`, then sat until `timeout` killed it (exit 124), with "the server exited before 'Done ('".
+**Cause:** `feed_console | { java ... } > "$OUT"`: both sides of a pipeline start together, and the redirect that
+truncates `$OUT` runs in the right side. When feed_console's first poll won the race, it read the previous boot's
+`dev-server-smoke: server exited 1` (boot 2 is a refusal, so it always leaves one), returned without `stop`.
+Intermittent: one pair of 17, once. (The same pair's first failure was a real one: Windows commit exhaustion during
+another repo's test run, hs_err "insufficient memory", after `setup matches` had already been logged.)
+**Fix:** `: > "$OUT"` before the pipeline; a self-test case pins its place (a race can't be pinned by a run).
+**Rule:** never let a reader of a file start in the same pipeline as the redirect that resets it.
+**Affects:** scripts/dev-server-smoke.sh

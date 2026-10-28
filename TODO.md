@@ -1365,17 +1365,22 @@ unattended straight after F.1 (game windows open on the desktop); stop after F.2
       2. **javap first** (it can stop the 26.1/26.1.1 range): MainMixin's and WorldOpenFlowsMixin's targets and every
          client/server method common code calls through a Stonecutter branch for 26.1.2, compared in the 26.1 and
          26.1.1 jars. A difference → stop and report.
-      3. **Fabric client on 26.1 and 26.1.1:** `-Pfabric_minecraft.26.1.2=<mc> -Pfabric_api_version.26.1.2=<api>`
-         swaps the 26.1.2 node's Minecraft (default: the band); the client and GameTest run dirs move to
-         `run/fabric/26.1.2@<mc>/` so a 26.1.2 world is never opened by an older game. `runClientGameTest` → `client
-         world check: PASS`, `client gate check: PASS`.
-      4. **Quilt client (Prism):** instance `commitment-quilt-smoke` (new folder under Prism's `instances/`, its own
-         `mmc-pack.json`: Minecraft <mc> + Quilt Loader `quilt_loader_version`; mods: the built Fabric jar + Fabric
-         API). A script copies a disposable world with only the golden guard pack into its saves (as
-         `client-locked-smoke.sh`), `prismlauncher --launch commitment-quilt-smoke --world <copy>`, waits for the
-         locked screen's lines, stops the game PID it started (found by command line naming the instance dir), and
-         Prism's PID if it started it. Plus a plain uncommitted world copy → it opens (a world-joined line). Nodes
-         26.1.2, 26.2, 26.3 and 26.1, 26.1.1.
+      3. **Fabric client on 26.1 and 26.1.1:** ~~Loom swap~~ (owner, session 13, decisions.md 2026-10-28): the
+         **shipped** jar in Prism, step 4's script with `PRISM_LOADER=fabric`.
+      4. **Prism client** `scripts/prism-smoke.sh` (`PRISM_LOADER=fabric|quilt NODE=<node> MC=<mc>`): instance
+         `commitment-smoke` (new folder under Prism's `instances/`, a marker file; refused if the folder exists
+         without it). Each run rewrites its `mmc-pack.json` (Minecraft <mc> + Fabric Loader `loader_version` or Quilt
+         Loader `quilt_loader_version`), its `instance.cfg` (`OverrideEnv`, `Env` LOCALAPPDATA →
+         `run/prism/appdata`, so the lock mirror stays in run/), and its mods (the built Fabric jar + the Fabric API
+         that rung 6's real server of <mc> downloaded and checked). Prism reads those only at start, so the run
+         refuses (exit 2) while any Prism is running, starts Prism itself, and closes it after. Two launches, each a
+         copy of rung 6's world of that <mc> (made by that Minecraft: no downgrade): (a) with only the golden guard
+         pack → the locked screen's lines (as `client-locked-smoke.sh`) and a boot line naming the loader and <mc>;
+         (b) as it is, uncommitted → `scanned the setup of` and `joined the game`, no locked line. Game PID found by
+         its command line naming the instance dir, new since launch; never by name. Copies removed by marker; the
+         golden mirror removed by name after a CMTLOCK check. After every run: the owner's
+         `%LOCALAPPDATA%\Commitment` must not exist (it didn't, 2026-10-28) or the run fails. Self-test: the copy and
+         mods guards on scratch dirs. Runs: Quilt 26.1, 26.1.1, 26.1.2, 26.2, 26.3; Fabric 26.1, 26.1.1.
       **Progress, session 12 (uncommitted):** step 1's harness written (`fabric_server`, `fabric_api` with a
       Minecraft, `REAL=<mc>` for fabric/quilt; gradle.properties `real_fabric_api.*`, `fabric_installer_version`);
       `dev-server-smoke.sh --self-test` all passed; mutation (band check without its `.`) → red, restored (`cmp`).
@@ -1389,10 +1394,22 @@ unattended straight after F.1 (game windows open on the desktop); stop after F.2
       5. **The matrix, at the pins, built jars of 1.0.0** (exit codes and matched lines recorded below):
          | Loader | Rung 5 (client) | Rung 6 (built jar, real server: `commit-smoke.sh commit-flow.txt locked-config.txt config-restored.txt`) |
          |---|---|---|
-         | Fabric | `runClientGameTest` 1.21.11, 26.1.2, 26.2, 26.3; step 3 on 26.1, 26.1.1 | REAL= 1.21.11, 26.1, 26.1.1, 26.1.2, 26.2, 26.3 |
-         | Quilt | step 4 on 26.1, 26.1.1, 26.1.2, 26.2, 26.3 | REAL= 26.1, 26.1.1, 26.1.2, 26.2, 26.3 |
+         | Fabric | `runClientGameTest` 1.21.11, 26.1.2, 26.2, 26.3; `prism-smoke.sh` 26.1, 26.1.1 | REAL= 1.21.11, 26.1, 26.1.1, 26.1.2, 26.2, 26.3 |
+         | Quilt | `prism-smoke.sh` 26.1, 26.1.1, 26.1.2, 26.2, 26.3 | REAL= 26.1, 26.1.1, 26.1.2, 26.2, 26.3 |
          | NeoForge | `client-locked-smoke.sh` 26.1.2, 26.2, 26.3 | REAL= 26.1.2.122, 26.2.0.93, 26.3.0.95 (floors: F.0) |
          | Forge | `client-locked-smoke.sh` 26.1.2, 26.2, 26.3 | REAL= 64.1.5, 65.1.5, 66.1.0 (floors: F.0) |
+         **Rung 6, session 13: exit 0 on all 17** (`LOADER=<l> NODE=<n> REAL=<v> commit-smoke.sh commit-flow.txt
+         locked-config.txt config-restored.txt`, the 1.0.0 jars of F.1's build). Each: 3 × `dev-server-smoke: PASS`
+         (committed: `world committed (N mods, ...)`, lock record + mirror under `run/real/.../appdata` + guard pack;
+         refused: `Config added: config/commitment-smoke-locked.json`; restored: `world is committed and its setup
+         matches`, `heartbeat on`); lock files removed by commit-smoke. Boot lines read from each server's
+         `latest.log`: `Commitment 1.0.0 loaded on Fabric 0.19.5, Minecraft` 1.21.11 / 26.1 / 26.1.1 / 26.1.2 / 26.2 /
+         26.3; `on Quilt 0.31.0-beta.4, Minecraft` 26.1 / 26.1.1 / 26.1.2 / 26.2 / 26.3; `on NeoForge` 26.1.2.122 /
+         26.2.0.93 / 26.3.0.95; `on Forge` 64.1.5 / 65.1.5 / 66.1.0. Fabric 26.3 took three runs: (1) exit 1, the
+         third boot's JVM died of Windows commit exhaustion during another repo's test run (hs_err, after `setup
+         matches`); (2) exit 1 (124), a harness race: the boot reached `Done (` but never got `stop` (gotchas
+         2026-10-28; fixed, self-test pins it, mutation red); (3) exit 0. The owner's `%LOCALAPPDATA%\Commitment`
+         doesn't exist after all 17.
       **Not doing:** Quilt on 1.21.11 (not claimed); NeoForge/Forge clients below the pin again (F.0 3(c)); multiplayer
       clients; touching the owner's Prism instances, accounts or settings.
       **Blast radius:** `run/real/{fabric,quilt}/` (new, git-ignored, rebuilt by the scripts); one new Prism instance

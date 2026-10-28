@@ -348,6 +348,16 @@ self_test() {
 		echo "FAIL a Fabric REAL moves the run root and the mirror"
 		failures=$((failures + 1))
 	fi
+	# $OUT is emptied before the server's pipeline starts: a race, so pinned by where the line is, not by a run.
+	local emptied piped
+	emptied=$(grep -n '^: > "\$OUT"$' "$0" | head -1 | cut -d: -f1 || true)
+	piped=$(grep -nP '^\tfeed_console \|' "$0" | head -1 | cut -d: -f1 || true)
+	if [[ -n $emptied && -n $piped ]] && (( emptied < piped )); then
+		echo "ok   \$OUT is emptied before feed_console starts"
+	else
+		echo "FAIL \$OUT is emptied before feed_console starts (line ${emptied:-none}, pipeline line ${piped:-none})"
+		failures=$((failures + 1))
+	fi
 	# fabric_api removes other Fabric API jars: only in a Quilt or real Fabric/Quilt server's mods dir. Refused before
 	# any download, by its own message. Run from $dir with no gradle.properties, so a broken guard writes nothing real.
 	local mods jars=$PWD/scripts/server-jars.sh
@@ -567,6 +577,9 @@ if ! run_steps before ${BEFORE[@]+"${BEFORE[@]}"}; then
 fi
 bash scripts/world-audit.sh snapshot "$WORLD" "$AUDIT_BEFORE"
 touch "$MARKER"
+# Emptied now, not by the pipeline's own `> "$OUT"`: both sides of the pipeline start at once, and feed_console could
+# read the last run's "server exited" line before the redirect truncates it, then never send stop (gotchas 2026-10-28).
+: > "$OUT"
 
 # wait_for_line <regex>: an @wait step. Polls this run's log; on a timeout it says so and lets the commands go on,
 # and the verdict fails the unmatched @wait.

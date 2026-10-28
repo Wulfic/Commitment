@@ -505,3 +505,14 @@ launch it with the owner's account. Nothing else in Prism is touched: no other i
 **Rejected:** Recording Quilt's client as a skip. A Loom dev client running Quilt Loader (new harness, may not work on
 Quilt's 26.x betas).
 **Affects:** TODO F.2; the owner's Prism data dir (one new instance folder, removed after only on the owner's word)
+
+## 2026-10-28 — Fabric's 26.1 / 26.1.1 client check runs the shipped jar in Prism, not a Loom recompile
+**Context:** F.2 step 3 planned `-Pfabric_minecraft.26.1.2=<mc>` + `runClientGameTest`: that recompiles the node
+against 26.1, so it tests a different artifact than the release, and leaves a 26.1-compiled jar in `build/libs`.
+**Choice:** Owner (session 13): the shipped `commitment-1.0.0+fabric-mc26.1.jar` runs on real 26.1 and 26.1.1 clients
+in the same disposable Prism instance as Quilt, renamed `commitment-smoke`; its loader (Fabric or Quilt) and Minecraft
+are rewritten per run (`scripts/prism-smoke.sh`). The 26.1.2 / 26.2 / 26.3 Fabric clients stay `runClientGameTest`.
+**Why:** Rung 5 is about the jar players get. Step 2's class-file check already showed the sources resolve on 26.1.
+**Rejected:** The Loom swap (recompiled jar, build.gradle change, a rebuild before release). Both (more code, the
+GameTest's extra checks already ran at the pin).
+**Affects:** TODO F.2 steps 3-4, scripts/prism-smoke.sh, the owner's Prism data dir (one instance)
