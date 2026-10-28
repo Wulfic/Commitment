@@ -7,6 +7,8 @@
 # mod wrote for the golden lock.
 #
 #   LOADER=neoforge NODE=26.3 bash scripts/client-locked-smoke.sh
+#   LOADER=neoforge NODE=26.3 LOADER_VERSION=26.3.0.51-beta bash scripts/client-locked-smoke.sh
+#                                    # the dev client on another loader build (-P<loader>_version.<node>), named in the log
 #   bash scripts/client-locked-smoke.sh --self-test        # the copy's removal guards, on scratch dirs
 #
 # Exit codes: 0 proven · 1 the mod is bad · 2 nothing proven (no source world, leftovers, the client never launched,
@@ -93,6 +95,21 @@ case "$LOADER" in
 	fabric | neoforge | forge) ;;
 	*) echo "LOADER must be fabric, neoforge or forge, not '$LOADER'" >&2; exit 2 ;;
 esac
+LOADER_VERSION=${LOADER_VERSION:-}
+VERSION_ARGS=()
+BOOT_RE="Commitment [^ ]+ loaded on (Fabric|Quilt|NeoForge|Forge) "
+if [[ -n $LOADER_VERSION ]]; then
+	if [[ $LOADER != neoforge && $LOADER != forge ]]; then
+		echo "LOADER_VERSION is for LOADER=neoforge or forge, not '$LOADER'" >&2
+		exit 2
+	fi
+	if [[ ! $LOADER_VERSION =~ ^[0-9]+(\.[0-9]+)+(-beta)?$ ]]; then
+		echo "LOADER_VERSION must be a loader version like 26.3.0.51-beta or 66.0.0, not '$LOADER_VERSION'" >&2
+		exit 2
+	fi
+	VERSION_ARGS=("-P${LOADER}_version.$NODE=$LOADER_VERSION")
+	BOOT_RE="Commitment [^ ]+ loaded on (NeoForge|Forge) $(sed 's/\./\\./g' <<< "$LOADER_VERSION"),"
+fi
 RUN=run/$LOADER/$NODE
 SOURCE=$RUN/server/world
 SAVES=$RUN/client/saves
@@ -164,7 +181,7 @@ java_pids > "$STARTED.before"
 touch "$STARTED"
 
 echo "client-locked-smoke: :$LOADER:$NODE:runClient into $COPY_NAME, output in $OUT"
-./gradlew ":$LOADER:$NODE:runClient" "-Pcommitment.quickPlay=$COPY_NAME" --console=plain > "$OUT" 2>&1 &
+./gradlew ":$LOADER:$NODE:runClient" "-Pcommitment.quickPlay=$COPY_NAME" ${VERSION_ARGS[@]+"${VERSION_ARGS[@]}"} --console=plain > "$OUT" 2>&1 &
 gradle_pid=$!
 
 waited=0 seen=no
@@ -206,7 +223,7 @@ if [[ ! -f $LOG || ! $LOG -nt $STARTED ]]; then
 	exit 2
 fi
 fail=0
-for re in "$LOCKED_LINE" "$CHANGE_LINE" "$REASON_LINE" "$SHOWN_LINE" "Commitment [^ ]+ loaded on (Fabric|Quilt|NeoForge|Forge) "; do
+for re in "$LOCKED_LINE" "$CHANGE_LINE" "$REASON_LINE" "$SHOWN_LINE" "$BOOT_RE"; do
 	if line=$(grep -m1 -E -- "$re" "$LOG"); then
 		echo "matched $re: $line"
 	else

@@ -156,7 +156,8 @@ fi
 
 export LOADER=${LOADER:-fabric}
 export NODE=${NODE:-26.3}
-RUN=run/$LOADER/$NODE
+export REAL=${REAL:-}
+RUN=$(run_root "$LOADER" "$NODE")
 # No server.properties before a server's first boot (a fresh Quilt server): the pipeline fails, and that's no error.
 LEVEL_NAME=$(sed -n 's/^level-name=//p' "$RUN/server/server.properties" 2> /dev/null | tr -d '\r') || true
 WORLD=$RUN/server/${LEVEL_NAME:-world}

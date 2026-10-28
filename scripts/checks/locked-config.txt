@@ -2,8 +2,8 @@
 # gate names it and refuses the world before it loads, with exit 1. The file is removed after the stop. Run in order:
 #   LOADER=<fabric|neoforge|forge> NODE=<1.21.11 (fabric only)|26.1.2|26.2|26.3> bash scripts/commit-smoke.sh \
 #       scripts/checks/commit-flow.txt scripts/checks/locked-config.txt scripts/checks/config-restored.txt
-@before mkdir -p "run/$LOADER/$NODE/server/config" && printf '{}\n' > "run/$LOADER/$NODE/server/config/commitment-smoke-locked.json"
-@after rm -f -- "run/$LOADER/$NODE/server/config/commitment-smoke-locked.json"
+@before mkdir -p "$RUN_ROOT/server/config" && printf '{}\n' > "$RUN_ROOT/server/config/commitment-smoke-locked.json"
+@after rm -f -- "$RUN_ROOT/server/config/commitment-smoke-locked.json"
 @exits-nonzero
 @allow-error Commitment: setup changed since /commit, refusing to load world
 @expect Commitment: setup changed since /commit, refusing to load world

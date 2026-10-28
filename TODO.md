@@ -1295,6 +1295,27 @@ NeoForge and Forge first** (step C.0), so Proof 2 runs on all nine loader × nod
          commit-flow.txt locked-config.txt config-restored.txt` exit 0 (a jar still declaring the pin refuses to load
          there: the revert check); (c) `client-locked-smoke.sh` at the floor (`GRADLE_EXTRA=-P<l>_version.<n>=<floor>`),
          exit 0. Then `./gradlew build` at the pins (the release jars are rebuilt).
+      **Progress, session 11:** step 1 committed (`9872952`; build green, common 301 ×4, fabric 16 ×4, GameTests 6 on
+      10/10 pairs; LoaderFloorTest red on a floor above its pin and on the template back on the pin). Step 2's harness
+      self-test green (`dev-server-smoke.sh --self-test`, 4 REAL cases). **3(b), pin-built jars on real servers**
+      (`REAL=<v> commit-smoke.sh commit-flow.txt locked-config.txt config-restored.txt`): **exit 0** on NeoForge
+      26.3.0.51-beta, Forge 66.0.0, 65.0.0, 64.0.0 (3 PASS each: committed; refused with `Config added:
+      config/commitment-smoke-locked.json`; `setup matches`; boot line `loaded on Forge 64.0.0` etc.; lock files
+      removed). **Exit 1 on NeoForge 26.2.0.57, 26.1.2.71 and both fallbacks 26.2.0.88, 26.1.2.74**: MixinExtras 0.5.4
+      (bundled by those builds) crashes applying MainMixin's `@Redirect` before any mod loads (gotchas 2026-10-28).
+      MixinExtras 0.5.5 ships from 26.1.2.114 and 26.2.0.90 (jar metadata). **Owner (decisions.md 2026-10-28): floors
+      26.1.2.114 and 26.2.0.90.** Rebuilt; **3(b) exit 0 on both** (3 PASS each, `loaded on NeoForge 26.1.2.114` /
+      `26.2.0.90`, lock files removed).
+      **Revert check:** the floor set back to the pin and rebuilt → on the floor server NeoForge 26.1.2.114 exit 1
+      (`Mod commitment requires neoforge 26.1.2.122 or above`), Forge 66.0.0 exit 1 (`requires forge 66.1.0 or above`);
+      gradle.properties restored (`cmp`).
+      **3(a)** `./gradlew :{neoforge,forge}:{26.1.2,26.2,26.3}:build -P<l>_version.<n>=<floor> -Pgametest_max_parallel=1
+      --continue` **exit 0**: compiles against each floor, `All 6 required tests passed` ×6, each GameTest server's boot
+      line names its floor (`loaded on Forge 64.0.0`, ... `NeoForge 26.3.0.51-beta`). (First try: Forge 26.1.2's
+      GameTest JVM refused by Windows' commit memory with three servers at once; one at a time was green.)
+      **3(c)** `LOADER_VERSION=<floor> client-locked-smoke.sh` **exit 0 on all six**: locked screen, its lines and
+      buttons, the change line, the boot line naming the floor build.
+      **Floors:** NeoForge 26.1.2.114, 26.2.0.90, 26.3.0.51-beta; Forge 64.0.0, 65.0.0, 66.0.0.
       **Not doing:** Fabric/Quilt floors; Minecraft ranges; compiling the release against the floor; floors below
       what's proven (no bisecting past the fallback).
       **Blast radius:** `run/real/` (new, git-ignored; checksummed downloads, rebuilt by the script), dev world copies;

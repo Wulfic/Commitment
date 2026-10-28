@@ -4,7 +4,7 @@
 > cheap to read at the start of every session. History belongs in `decisions.md` and
 > `gotchas.md`; this file only answers "where am I right now?".
 
-**Last updated:** 2026-10-28 (session 11: Stage F planned, F.0 started)
+**Last updated:** 2026-10-28 (session 11: F.0 done)
 **Branch:** `main`, always (decisions.md 2026-10-21). Push each green stage (owner, 2026-10-21).
 
 ## Where we are
@@ -16,8 +16,10 @@
   `config/` is one boot of another world. E.2: the scan is under 1 s on 175 mods.
 
 ## Next
-1. Stage F (TODO F.0 → F.1 → F.2). Owner, session 11: lower the NeoForge/Forge floor (F.0), GitHub Release only,
-   version 1.0.0. Stop after each of F.0, F.1, F.2; release only on the owner's go.
+1. Stage F (TODO F.0 → F.1 → F.2). Owner, session 11: GitHub Release only, version 1.0.0. Stop after each of F.0,
+   F.1, F.2; release only on the owner's go. **F.0 done:** floors NeoForge 26.1.2.114 / 26.2.0.90 / 26.3.0.51-beta,
+   Forge 64.0.0 / 65.0.0 / 66.0.0 (`neoforge_floor.*`, `forge_floor.*`), each proven on a real server, a client and
+   GameTests. Next: F.1 README + CHANGELOG (floors, the MixinExtras reason), version bump to 1.0.0.
 - Untested: SettingsLock/CommitmentServer catch blocks around the tick check (TODO C.6).
 
 ## How to run things
@@ -33,6 +35,9 @@
 - Guard without the mod: `NODE=.. bash scripts/vanilla-guard-smoke.sh` (Mojang server jar into run/vanilla/<node>).
 - Pack run: `LOADER=.. NODE=.. PACK=run/packs/<node>/<pack> bash scripts/pack-smoke.sh` (5 client launches; `--clean`
   removes a failed run's copy). Packs: `python -I scripts/pack-fetch.py <version id> <dir>`.
+- Real loader server: `LOADER=<neoforge|forge> NODE=.. REAL=<loader version> bash scripts/commit-smoke.sh ...` (built
+  jar, `run/real/<loader>/<node>/<version>/`). Client on another loader build: `LOADER_VERSION=<v> client-locked-smoke.sh`.
+  GameTests on one build: `-P<loader>_version.<node>=<v>`; `-Pgametest_max_parallel=1` if Windows refuses commit memory.
 - Tamper matrix: `bash scripts/tamper-matrix.sh [loader:node ...]` → `build/tamper-matrix.md`; Quilt needs the built
   Fabric jar. `tamper.sh` backups live in `run/<loader>/<node>/tamper-backup/` (never auto-deleted).
 

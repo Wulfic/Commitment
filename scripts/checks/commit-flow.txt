@@ -23,7 +23,7 @@ unlock cancel
 @wait Commitment: to Server: Commitment: unlock cancelled
 @expect Commitment: to Server: Commitment: /commit locks this world's setup: [0-9]+ mods?, [0-9]+ resource packs?, [0-9]+ config files?
 @expect Commitment: wrote lock record .*commitment\.dat \(lock [0-9a-f-]+, revision 1\)
-@expect Commitment: wrote lock mirror .*[\/]run[\/][a-z]+[\/][0-9.]+[\/](mirror|appdata[\/]Commitment[\/]locks)[\/][0-9a-f-]+\.dat \(revision 1\)
+@expect Commitment: wrote lock mirror .*[\/]run[\/](real[\/])?[a-z]+[\/][0-9.]+[\/]([0-9.]+(-beta)?[\/])?(mirror|appdata[\/]Commitment[\/]locks)[\/][0-9a-f-]+\.dat \(revision 1\)
 @expect Commitment: wrote guard pack .*commitment_guard\.zip
 @expect There are [0-9]+ data pack\(s\) enabled: .*file/commitment_guard\.zip
 @expect Commitment: to Server: Commitment: unlock available at .* \(24h\)

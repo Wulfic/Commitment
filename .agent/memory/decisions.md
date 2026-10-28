@@ -464,3 +464,13 @@ Compiling the release against the floor (would void Stages C–E's dev proofs). 
 later). 0.1.0.
 **Affects:** gradle.properties, neoforge|forge mods.toml, scripts/dev-server-smoke.sh, commit-smoke.sh, server-jars.sh,
 README, TODO Stage F
+
+## 2026-10-28 — NeoForge 26.1.2/26.2 floors at the first MixinExtras 0.5.5 build
+**Context:** F.0: every NeoForge 26.1.2/26.2 build bundling MixinExtras 0.5.4 (before 26.1.2.114 / 26.2.0.90, so the
+E.1 packs' 26.1.2.74 and 26.2.0.88 too) crashes at server start applying MainMixin's `@Redirect` (gotchas 2026-10-28).
+**Choice:** Owner (session 11): floors 26.1.2.114 and 26.2.0.90; 26.3 stays at 26.3.0.51-beta, Forge at x.0.0.
+**Why:** No code change; those packs ran fine on newer NeoForge in E.1 (the Sodium break was 26.3's, and 26.3's floor
+covers its pack).
+**Rejected:** Bundling MixinExtras 0.5.5 jar-in-jar (upgrades it for the whole pack). Rewriting MainMixin (common code:
+every pair's server gate re-proven, and another 0.5.4 path might still trip).
+**Affects:** gradle.properties neoforge_floor.26.1.2/26.2, README, TODO F.0

@@ -31,11 +31,21 @@ inside() {
 	[[ -n $1 && -n $2 && $2 == "$1"/* && $2 != *..* ]]
 }
 
-# mirror_dir <loader> <node>: the dev run's lock mirror dir. The dev loaders set -Dcommitment.mirrorDir (each
-# build.gradle); Quilt runs the released jar, which ignores it, with LOCALAPPDATA pointed into run/ instead.
+# run_root <loader> <node>: the run's root, holding server/ (and appdata/ for a built jar). With REAL=<loader version>
+# in the environment, the built jar's real server of that loader build: run/real/<loader>/<node>/<version>.
+run_root() {
+	if [[ -n ${REAL:-} ]]; then
+		echo "run/real/$1/$2/$REAL"
+	else
+		echo "run/$1/$2"
+	fi
+}
+
+# mirror_dir <loader> <node>: the run's lock mirror dir. The dev loaders set -Dcommitment.mirrorDir (each
+# build.gradle); a built jar (Quilt, REAL) ignores it, and runs with LOCALAPPDATA pointed into run/ instead.
 mirror_dir() {
-	if [[ $1 == quilt ]]; then
-		echo "run/quilt/$2/appdata/Commitment/locks"
+	if [[ $1 == quilt || -n ${REAL:-} ]]; then
+		echo "$(run_root "$1" "$2")/appdata/Commitment/locks"
 	else
 		echo "run/$1/$2/mirror"
 	fi

@@ -5,6 +5,8 @@
 #   scripts/dev-server-smoke.sh scripts/checks/boot.txt          # boot, send each command, stop
 #   LOADER=neoforge NODE=26.1.2 scripts/dev-server-smoke.sh ...  # another loader or node
 #   LOADER=quilt NODE=26.3 scripts/dev-server-smoke.sh ...       # the built Fabric jar on a real Quilt server
+#   LOADER=neoforge NODE=26.3 REAL=26.3.0.51-beta scripts/dev-server-smoke.sh ...
+#                                                                # the built jar on a real server of that loader build
 #   scripts/dev-server-smoke.sh --self-test                      # check the verdict against synthetic logs
 #
 # Exit codes: 0 proven · 1 the mod is bad · 2 nothing proven (port busy, bad arguments, Gradle failed before the
@@ -12,7 +14,9 @@
 #
 # LOADER=quilt runs outside Gradle: Quilt Loader's server in run/quilt/<node>/server (scripts/server-jars.sh), with
 # the node's built Fabric jar (build it first) and Fabric API in mods/, and LOCALAPPDATA set to run/quilt/<node>/appdata
-# so the lock mirror of a released jar stays in run/ too.
+# so the lock mirror of a released jar stays in run/ too. REAL=<loader version> (LOADER=neoforge or forge) does the same
+# on a real server of that NeoForge or Forge build, in run/real/<loader>/<node>/<version>/server, and requires the boot
+# line to name that build. @sh, @before and @after steps see RUN_ROOT (run/<loader>/<node>, or the REAL one).
 #
 # Lines in the commands file:
 #   <command>          typed into the server console, after this run's "Done (" line
@@ -41,6 +45,8 @@
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
+# run_root, mirror_dir.
+source scripts/lock-files.sh
 
 BOOT_LINE='Commitment .* loaded on (Fabric|Quilt|NeoForge|Forge) '
 # Log4j puts the level in the thread's bracket ("[Server thread/ERROR]"), so a bare "\[ERROR\]" matches nothing.
@@ -52,6 +58,11 @@ LAUNCHED_LINE='^\[[0-9:]+\] \[[^]]+/(INFO|WARN|ERROR|FATAL|DEBUG)\]'
 # Written after a server launched outside Gradle ends, so the console feed stops waiting for a "Done (" that a refusal
 # never prints (Gradle's own "BUILD ..." line does that for runServer).
 EXITED_LINE='^dev-server-smoke: server exited [0-9]+$'
+
+# real_boot_line <loader version>: the boot line of a REAL run, naming that build ("loaded on NeoForge 26.3.0.51-beta,").
+real_boot_line() {
+	echo "Commitment .* loaded on (NeoForge|Forge) $(sed 's/\./\\./g' <<< "$1"),"
+}
 
 # launched <output>: did the game's JVM run at all? No means exit 2, whatever Gradle's exit code says.
 launched() {
@@ -105,6 +116,10 @@ verdict() {
 		fi
 	else
 		grep -qE -- "$BOOT_LINE" "$out" || { echo "FAIL: no boot line matching: $BOOT_LINE"; fail=1; }
+		if [[ -n ${REAL:-} ]] && ! grep -qE -- "$(real_boot_line "$REAL")" "$out"; then
+			echo "FAIL: the boot line doesn't name the loader build REAL=$REAL: $(grep -m1 -E -- "$BOOT_LINE" "$out" || echo none)"
+			fail=1
+		fi
 	fi
 	errors=$(grep -E -- "$ERROR_LINE" "$out" | grep -i 'commitment' || true)
 	for re in ${allowed[@]+"${allowed[@]}"}; do
@@ -261,6 +276,34 @@ self_test() {
 	exit_check 0 "@exits-nonzero: a refusal's exit 1 passes" 1 yes
 	exit_check 1 "@exits-nonzero: exit 0 fails" 0 yes
 	exit_check 1 "@exits-nonzero: a timeout fails" 124 yes
+
+	# REAL: the built jar on a real NeoForge or Forge server of that build, in its own run root.
+	local got pin prefix
+	got=0; LOADER=fabric REAL=0.19.5 bash "$0" > /dev/null 2>&1 || got=$?
+	if [[ $got == 2 ]]; then echo "ok   REAL on Fabric is refused (exit 2)"; else echo "FAIL REAL on Fabric is refused: exit $got"; failures=$((failures + 1)); fi
+	got=0; LOADER=neoforge REAL=../../x bash "$0" > /dev/null 2>&1 || got=$?
+	if [[ $got == 2 ]]; then echo "ok   a REAL that isn't a version is refused (exit 2)"; else echo "FAIL a REAL that isn't a version is refused: exit $got"; failures=$((failures + 1)); fi
+	if [[ $(REAL=66.0.0 run_root forge 26.3) == run/real/forge/26.3/66.0.0 &&
+		$(REAL=66.0.0 mirror_dir forge 26.3) == run/real/forge/26.3/66.0.0/appdata/Commitment/locks &&
+		$(REAL='' run_root forge 26.3) == run/forge/26.3 && $(REAL='' mirror_dir forge 26.3) == run/forge/26.3/mirror ]]; then
+		echo "ok   REAL moves the run root and the mirror, and only REAL does"
+	else
+		echo "FAIL REAL moves the run root and the mirror, and only REAL does"
+		failures=$((failures + 1))
+	fi
+	printf '%s\n' '[16:00:01] [main/INFO] (commitment) Commitment 1.0.0 loaded on NeoForge 26.3.0.51-beta, Minecraft 26.3' \
+		"$done_line" > "$dir/real.log"
+	printf '%s\n' '[16:00:01] [main/INFO] (commitment) Commitment 1.0.0 loaded on NeoForge 26.3.0.95, Minecraft 26.3' \
+		"$done_line" > "$dir/real-pin.log"
+	got=0; REAL=26.3.0.51-beta verdict "$dir/real.log" > /dev/null || got=$?
+	pin=0; REAL=26.3.0.51-beta verdict "$dir/real-pin.log" > /dev/null || pin=$?
+	prefix=0; REAL=26.3.0.5 verdict "$dir/real.log" > /dev/null || prefix=$?
+	if [[ $got == 0 && $pin == 1 && $prefix == 1 ]]; then
+		echo "ok   a REAL run's boot line has to name that build"
+	else
+		echo "FAIL a REAL run's boot line has to name that build (got $got, pin $pin, prefix $prefix)"
+		failures=$((failures + 1))
+	fi
 	rm -rf "$dir"
 	bash scripts/world-audit.sh --self-test || failures=$((failures + 1))
 	bash scripts/commit-smoke.sh --self-test || failures=$((failures + 1))
@@ -284,10 +327,7 @@ BOOT_TIMEOUT=${BOOT_TIMEOUT:-420}
 WAIT_TIMEOUT=${WAIT_TIMEOUT:-90}
 COMMANDS_FILE=${1:-}
 PORT=$(grep -E '^dev_server_port=' gradle.properties | cut -d= -f2 | tr -d '[:space:]')
-RUN_DIR=run/$LOADER/$NODE/server
-LOG=$RUN_DIR/logs/latest.log
-OUT=build/dev-server-smoke-$LOADER-$NODE.out
-MARKER=build/dev-server-smoke-$LOADER-$NODE.marker
+export REAL=${REAL:-}
 
 case "$LOADER" in
 	fabric | neoforge | forge) ;;
@@ -299,6 +339,24 @@ case "$LOADER" in
 		;;
 	*) echo "LOADER must be fabric, quilt, neoforge or forge, not '$LOADER'" >&2; exit 2 ;;
 esac
+# REAL names a directory under run/real: a loader version, nothing that could climb out of it.
+if [[ -n $REAL ]]; then
+	if [[ $LOADER != neoforge && $LOADER != forge ]]; then
+		echo "REAL is for LOADER=neoforge or forge (Quilt always runs the built jar), not '$LOADER'" >&2
+		exit 2
+	fi
+	if [[ ! $REAL =~ ^[0-9]+(\.[0-9]+)+(-beta)?$ ]]; then
+		echo "REAL must be a loader version like 26.3.0.51-beta or 66.0.0, not '$REAL'" >&2
+		exit 2
+	fi
+fi
+export RUN_ROOT
+RUN_ROOT=$(run_root "$LOADER" "$NODE")
+RUN_DIR=$RUN_ROOT/server
+LOG=$RUN_DIR/logs/latest.log
+SUFFIX=$LOADER-$NODE${REAL:+-$REAL}
+OUT=build/dev-server-smoke-$SUFFIX.out
+MARKER=build/dev-server-smoke-$SUFFIX.marker
 # Every branch lists the same nodes in settings.gradle.
 if ! grep -qE "versions .*'$NODE'" settings.gradle; then
 	echo "no node '$NODE' in settings.gradle" >&2
@@ -347,7 +405,7 @@ WORLD=$RUN_DIR/${LEVEL_NAME:-world}
 source scripts/server-jars.sh
 JAR_DIR=""
 JAR_ARGS=()
-if [[ $SERVER == vanilla || $LOADER == quilt ]]; then
+if [[ $SERVER == vanilla || $LOADER == quilt || -n $REAL ]]; then
 	JVM_PROPS=()
 	if (( ${#GRADLE_ARGS[@]} > 0 )); then
 		props=$(jvm_props "${GRADLE_ARGS[@]}") || exit 2
@@ -380,8 +438,26 @@ elif [[ $LOADER == quilt ]]; then
 	done
 	cp -- "$BUILT" "$RUN_DIR/mods/"
 	[[ -f $RUN_DIR/eula.txt ]] || echo "eula=true" > "$RUN_DIR/eula.txt"
-	mkdir -p "run/quilt/$NODE/appdata"
+	mkdir -p "$RUN_ROOT/appdata"
 	JAR_ARGS=(-Xmx3G ${JVM_PROPS[@]+"${JVM_PROPS[@]}"} -jar quilt-server-launch.jar --port "$PORT" nogui)
+elif [[ -n $REAL ]]; then
+	JAR_DIR=$RUN_DIR
+	BUILT=$(compgen -G "$LOADER/versions/$NODE/build/libs/commitment-*+$LOADER-mc*.jar" | grep -v -- '-sources\.jar$' || true)
+	if [[ $(wc -w <<< "$BUILT") -ne 1 ]]; then
+		echo "dev-server-smoke: need exactly one built $LOADER jar in $LOADER/versions/$NODE/build/libs (found: ${BUILT:-none}); run ./gradlew :$LOADER:$NODE:build" >&2
+		exit 2
+	fi
+	loader_server "$LOADER" "$NODE" "$REAL" "$RUN_DIR" || { echo "dev-server-smoke: NOTHING PROVEN (exit 2): no $LOADER $REAL server" >&2; exit 2; }
+	mkdir -p "$RUN_DIR/mods"
+	for old in "$RUN_DIR"/mods/commitment-*.jar; do
+		if [[ -e $old && $(basename "$old") != "$(basename "$BUILT")" ]]; then
+			rm -- "$old"
+			echo "dev-server-smoke: removed the older $old" >&2
+		fi
+	done
+	cp -- "$BUILT" "$RUN_DIR/mods/"
+	mkdir -p "$RUN_ROOT/appdata"
+	JAR_ARGS=(-Xmx3G ${JVM_PROPS[@]+"${JVM_PROPS[@]}"} @user_jvm_args.txt "@$(loader_args "$LOADER" "$NODE" "$REAL")" --port "$PORT" nogui)
 fi
 if [[ -n $JAR_DIR ]]; then
 	LOG=$JAR_DIR/logs/latest.log
@@ -472,11 +548,11 @@ feed_console() {
 set +e
 if [[ -n $JAR_DIR ]]; then
 	echo "dev-server-smoke: java ${JAR_ARGS[*]} in $JAR_DIR ($SERVER server, $LOADER $NODE world) on port $PORT, output in $OUT"
-	# A released jar's lock mirror (MirrorDir reads LOCALAPPDATA) lands in run/quilt/<node>/appdata, never in yours.
+	# A released jar's lock mirror (MirrorDir reads LOCALAPPDATA) lands in <run root>/appdata, never in yours.
 	# Mojang's server never reads it.
 	APPDATA_DIR=${LOCALAPPDATA:-}
-	if [[ $LOADER == quilt && $SERVER == mod ]]; then
-		APPDATA_DIR=$(cygpath -w "$PWD/run/quilt/$NODE/appdata" 2> /dev/null || echo "$PWD/run/quilt/$NODE/appdata")
+	if [[ ($LOADER == quilt || -n $REAL) && $SERVER == mod ]]; then
+		APPDATA_DIR=$(cygpath -w "$PWD/$RUN_ROOT/appdata" 2> /dev/null || echo "$PWD/$RUN_ROOT/appdata")
 	fi
 	feed_console | {
 		(cd "$JAR_DIR" && LOCALAPPDATA=$APPDATA_DIR timeout $((BOOT_TIMEOUT + 180)) java "${JAR_ARGS[@]}")

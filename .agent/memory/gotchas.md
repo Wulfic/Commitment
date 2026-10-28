@@ -416,3 +416,21 @@ charge; our client reserves an 8 GB heap by default (1/4 of RAM).
 **Rule:** an `hs_err` "insufficient memory" is the environment, not the mod: list java processes by command line,
 wait for the other run to finish, rerun. Never stop another repo's JVMs or `gradlew --stop` (shared daemons).
 **Affects:** scripts/pack-smoke.sh runs
+
+## 2026-10-28 — Bash 5.3 drops the backslash in `${v//./\.}`; editing a running script breaks the run
+**Finding:** Git Bash's bash 5.3 (patsub_replacement) turns `"${v//./\.}"` and `"${v//./\.}"` into the plain value:
+the regex built to name a loader build ("26\.3\.0\.51-beta") had bare dots. `$(sed 's/\./\./g' <<< "$v")` escapes
+them. Separately, editing `dev-server-smoke.sh` while a `commit-smoke.sh` chain ran it ended that run with `syntax error
+near unexpected token '&'` at a line past the edit: bash reads a script as it goes.
+**Fix:** sed for regex escaping (both real-server boot regexes). Never edit a script a background run is executing;
+queue the edit for when it ends.
+**Affects:** scripts/dev-server-smoke.sh (real_boot_line), scripts/client-locked-smoke.sh (BOOT_RE)
+
+## 2026-10-28 — NeoForge builds bundling MixinExtras 0.5.4 crash on MainMixin's @Redirect at server start
+**Finding:** F.0's real servers: NeoForge 26.1.2.71, 26.1.2.74, 26.2.0.57, 26.2.0.88 die before any mod loads with
+`ClassCastException: ArrayList cannot be cast to AnnotationNode` in `mixinextras ... FactoryRedirectWrapperMixinTransformer
+.transform(:18)`, applying `MainMixin` (our `@Redirect` in `Main.main`). Those builds bundle MixinExtras 0.5.4; 0.5.5
+(26.1.2.114+, 26.2.0.90+, every 26.3 from 26.3.0.51-beta) loads it. Read from each universal jar's
+`META-INF/jarjar/metadata.json`, bisected over maven-metadata.xml, not booted. Forge 64.0.0/65.0.0/66.0.0 are fine.
+**Open:** floor at the first 0.5.5 build, bundle MixinExtras, or rewrite MainMixin: owner's call (TODO F.0).
+**Affects:** common/.../mixin/MainMixin.java, gradle.properties neoforge_floor.*, TODO F.0

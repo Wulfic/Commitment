@@ -7,10 +7,14 @@
 #   vanilla_jar 26.3 run/vanilla/26.3/server.jar        # Mojang's server jar (SHA-1 from piston-meta)
 #   quilt_server 26.3 run/quilt/26.3/server             # Quilt Loader server (installer SHA-1 from maven.quiltmc.org)
 #   fabric_api 26.3 run/quilt/26.3/server/mods          # Fabric API, the node's pin (SHA-1 from maven.fabricmc.net)
+#   loader_server neoforge 26.3 26.3.0.51-beta run/real/neoforge/26.3/26.3.0.51-beta/server
+#                                                       # a NeoForge or Forge server (installer SHA-1 from its maven)
 
 MANIFEST=https://piston-meta.mojang.com/mc/game/version_manifest_v2.json
 QUILT_MAVEN=https://maven.quiltmc.org/repository/release/org/quiltmc/quilt-installer
 FABRIC_API_MAVEN=https://maven.fabricmc.net/net/fabricmc/fabric-api/fabric-api
+NEOFORGE_MAVEN=https://maven.neoforged.net/releases/net/neoforged/neoforge
+FORGE_MAVEN=https://maven.minecraftforge.net/net/minecraftforge/forge
 
 # gradle_prop <key>: a value from gradle.properties (the repo root's), or fails.
 gradle_prop() {
@@ -102,4 +106,50 @@ fabric_api() {
 		rm -- "$other"
 		echo "server-jars: removed the other Fabric API $other" >&2
 	done
+}
+
+# loader_artifact <neoforge|forge> <node> <version>: the loader's Maven version and path under its maven (Forge's carry
+# the Minecraft version: 26.3-66.0.0).
+loader_artifact() {
+	case $1 in
+		neoforge) echo "$3 $NEOFORGE_MAVEN/$3/neoforge-$3" ;;
+		forge) echo "$2-$3 $FORGE_MAVEN/$2-$3/forge-$2-$3" ;;
+		*) echo "server-jars: no installer for loader '$1'" >&2; return 1 ;;
+	esac
+}
+
+# loader_args <neoforge|forge> <node> <version>: the arguments file the installer writes, relative to the server dir
+# (what its run.bat/run.sh pass to java after @user_jvm_args.txt). win_args.txt under Git Bash, whose java is Windows'.
+loader_args() {
+	local artifact os=unix
+	artifact=$(loader_artifact "$@") || return 1
+	case $(uname -s) in MINGW* | MSYS* | CYGWIN*) os=win ;; esac
+	case $1 in
+		neoforge) echo "libraries/net/neoforged/neoforge/${artifact%% *}/${os}_args.txt" ;;
+		forge) echo "libraries/net/minecraftforge/forge/${artifact%% *}/${os}_args.txt" ;;
+	esac
+}
+
+# loader_server <neoforge|forge> <node> <version> <dir>: that loader build installed as a server into <dir> (its
+# installer downloads and checks the vanilla server and the libraries). Skipped when <dir> already holds that install.
+loader_server() {
+	local loader=$1 node=$2 version=$3 dir=$4 artifact maven url jar stamp args
+	artifact=$(loader_artifact "$loader" "$node" "$version") || return 1
+	maven=${artifact%% *}
+	url=${artifact#* }-installer.jar
+	args=$(loader_args "$loader" "$node" "$version") || return 1
+	stamp="loader=$loader version=$maven"
+	if [[ -f $dir/$args && -f $dir/.commitment-loader-install && $(< "$dir/.commitment-loader-install") == "$stamp" ]]; then
+		return 0
+	fi
+	jar=run/real/installers/$loader-$maven-installer.jar
+	fetch_checked "$url" "$(curl -fsS --max-time 30 "$url.sha1" | tr -d '[:space:]')" "$jar" || return 1
+	mkdir -p "$dir"
+	echo "server-jars: installing $loader $maven as a server into $dir" >&2
+	if ! java -jar "$jar" --installServer "$dir" > "$dir/../installer.log" 2>&1; then
+		echo "server-jars: the $loader installer failed; see $dir/../installer.log" >&2
+		return 1
+	fi
+	[[ -f $dir/$args ]] || { echo "server-jars: the $loader installer wrote no $args" >&2; return 1; }
+	echo "$stamp" > "$dir/.commitment-loader-install"
 }
