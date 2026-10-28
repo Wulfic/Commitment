@@ -19,7 +19,7 @@ config = "commitment.mixins.json"
 [[dependencies.commitment]]
 modId = "neoforge"
 type = "required"
-versionRange = "[${neoforgeVersion},)"
+versionRange = "[${neoforgeFloor},)"
 ordering = "NONE"
 side = "BOTH"
 

@@ -15,7 +15,7 @@ Commit a world to the mods, resource packs and config it was played with. Changi
 [[dependencies.commitment]]
 modId = "forge"
 mandatory = true
-versionRange = "[${forgeVersion},)"
+versionRange = "[${forgeFloor},)"
 ordering = "NONE"
 side = "BOTH"
 

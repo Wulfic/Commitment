@@ -243,6 +243,10 @@ test {
 	// GameTestSourcesTest reads the GameTest sources and their fabric.mod.json.
 	inputs.dir(rootProject.file("fabric/src/gametest")).withPropertyName("gameTestSources")
 		.withPathSensitivity(PathSensitivity.RELATIVE)
+	// LoaderFloorTest reads the NeoForge and Forge mods.toml templates.
+	inputs.files(rootProject.file("neoforge/src/main/resources/META-INF/neoforge.mods.toml"),
+			rootProject.file("forge/src/main/resources/META-INF/mods.toml"))
+		.withPropertyName("loaderTemplates").withPathSensitivity(PathSensitivity.RELATIVE)
 	// BandLabelTest: the jar this node ships, and the Minecraft version it compiles against.
 	systemProperty "commitment.jarName", loomx.modJar.get().archiveFileName.get()
 	systemProperty "commitment.minecraft", band

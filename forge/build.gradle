@@ -6,6 +6,7 @@ plugins {
 def band = stonecutter.current.version
 def common = ":common:${stonecutter.current.project}"
 def forgeVersion = project.property("forge_version.$band")
+def forgeFloor = project.property("forge_floor.$band")
 
 // Keeps `:forge:26.2` a different module from `:common:26.2` (see common/build.gradle).
 group = "${project.group}.forge"
@@ -171,8 +172,8 @@ processResources {
 	def properties = [
 			version        : project.version,
 			minecraftRange : project.property("forge_minecraft_range.$band"),
-			forgeVersion   : forgeVersion,
-			forgeMajor     : forgeVersion.tokenize('.')[0],
+			forgeFloor     : forgeFloor,
+			forgeMajor     : forgeFloor.tokenize('.')[0],
 			packFormat     : project.property("forge_pack_format.$band"),
 	]
 	inputs.properties properties

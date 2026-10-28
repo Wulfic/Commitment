@@ -204,7 +204,7 @@ processResources {
 	def properties = [
 			version        : project.version,
 			minecraftRange : project.property("neoforge_minecraft_range.$band"),
-			neoforgeVersion: project.property("neoforge_version.$band"),
+			neoforgeFloor  : project.property("neoforge_floor.$band"),
 			iconKey        : project.property("neoforge_icon_key.$band"),
 	]
 	inputs.properties properties
