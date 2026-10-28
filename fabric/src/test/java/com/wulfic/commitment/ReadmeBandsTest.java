@@ -110,6 +110,8 @@ class ReadmeBandsTest {
 			assertJar(cells.get(1), "Fabric", property("band_label." + band));
 			assertJar(cells.get(2), "NeoForge", gradle.getProperty("neoforge_band_label." + band));
 			assertJar(cells.get(3), "Forge", gradle.getProperty("forge_band_label." + band));
+			assertFloor(cells.get(2), "NeoForge", gradle.getProperty("neoforge_floor." + band));
+			assertFloor(cells.get(3), "Forge", gradle.getProperty("forge_floor." + band));
 			for (String cell : cells) {
 				assertFalse(cell.contains("Planned"), "README row for band " + band + " still says Planned: " + cells);
 			}
@@ -124,6 +126,20 @@ class ReadmeBandsTest {
 		}
 		assertTrue(cell.equals("`mc" + label + "`") || cell.startsWith("`mc" + label + "`:"),
 				"README's " + loader + " cell '" + cell + "' should name the jar's band `mc" + label + "`");
+	}
+
+	/**
+	 * A player reads the loader they need from the cell, so it names the lowest build the jar declares (LoaderFloorTest
+	 * holds the jar to the same key).
+	 *
+	 * @param floor the loader's floor for the band, or null when the build makes no jar of that loader for the band
+	 */
+	private static void assertFloor(String cell, String loader, String floor) {
+		if (floor == null) {
+			return;
+		}
+		assertTrue(cell.contains(loader + " " + floor + " or newer"),
+				"README's " + loader + " cell '" + cell + "' should say '" + loader + " " + floor + " or newer'");
 	}
 
 	@Test

@@ -235,10 +235,12 @@ tasks.named('sourcesJar', Jar) {
 
 test {
 	useJUnitPlatform()
-	// ModMetadataTest reads the repo's LICENSE and ReadmeBandsTest its README and gradle.properties; Gradle runs
-	// tests from the node's folder, not the repo root. They're inputs, so editing one alone reruns the tests.
+	// ModMetadataTest reads the repo's LICENSE, ReadmeBandsTest its README and gradle.properties, ChangelogTest its
+	// CHANGELOG; Gradle runs tests from the node's folder, not the repo root. They're inputs, so editing one alone
+	// reruns the tests.
 	systemProperty "commitment.repoRoot", rootDir.absolutePath
-	inputs.files(rootProject.file("LICENSE"), rootProject.file("README.md"), rootProject.file("gradle.properties"))
+	inputs.files(rootProject.file("LICENSE"), rootProject.file("README.md"), rootProject.file("gradle.properties"),
+			rootProject.file("CHANGELOG.md"))
 		.withPropertyName("repoDocs").withPathSensitivity(PathSensitivity.RELATIVE)
 	// GameTestSourcesTest reads the GameTest sources and their fabric.mod.json.
 	inputs.dir(rootProject.file("fabric/src/gametest")).withPropertyName("gameTestSources")

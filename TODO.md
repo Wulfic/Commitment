@@ -1321,10 +1321,74 @@ NeoForge and Forge first** (step C.0), so Proof 2 runs on all nine loader × nod
       **Blast radius:** `run/real/` (new, git-ignored; checksummed downloads, rebuilt by the script), dev world copies;
       the `-P` builds overwrite `build/` jars, rebuilt by `./gradlew build`. **Rollback:** `git revert` of the F.0
       commits; `rm -r run/real/<loader>/<node>/<version>` after `ls` (no lock files left: commit-smoke's cleanup).
-- [ ] F.1 README: what it does, the threat model and its honest limits, the privacy note (the
-      internet time check, the OS mirror file), the band/loader table, how to get out (`/unlock`).
-      `CHANGELOG.md`.
-- [ ] F.2 Rungs 5 and 6 on every node × loader (Quilt boots the Fabric jar), recorded here.
+**Owner, session 12 (decisions.md 2026-10-28):** hold **all** pushes (F.0 included) until the release go. F.2 may run
+unattended straight after F.1 (game windows open on the desktop); stop after F.2 for the release go.
+
+- [x] F.1 **README, CHANGELOG, 1.0.0.** **Done, session 12:** red first (ChangelogTest: no CHANGELOG.md; ReadmeBandsTest:
+      the NeoForge cell had no floor), then green. Mutation: `forge_floor.26.2=65.0.1` and `version=1.0.1` → both red
+      for that reason; gradle.properties restored (`cmp`). 20 stale `0.1.0` jars removed by name. `./gradlew build
+      -Pgametest_max_parallel=1` exit 0: common 301 ×4, fabric 18 ×4 (was 16), `All 6 required tests passed` ×10,
+      ten `commitment-1.0.0+*` jars. Rung 3: `LOADER=fabric NODE=26.3 dev-server-smoke.sh scripts/checks/boot.txt`
+      exit 0, `Commitment 1.0.0 loaded on Fabric 0.19.5, Minecraft 26.3`, world audit clean (45/45).
+      1. README rewritten for players: what it does; commands (`/commit [confirm|status]`, `/unlock [confirm|cancel]`,
+         who may run them, the 60 s confirm); what's locked and what's never locked (the Exclusions lists, by mod);
+         game settings reverted live; dedicated servers (`server.properties`, stops with a non-zero exit); **how to
+         get out** (`/unlock` or the refusal screen's button → 24 h by internet time → lifts at the next world open →
+         remove the mod after that; what removing it early does); the threat model table and the honest limits
+         (TODO "Threat model"); the band table, now with each NeoForge/Forge cell naming its loader floor ("NeoForge
+         26.2.0.90 or newer") and Fabric Loader 0.19.5+ / Fabric API; Privacy kept; the "in development" status gone.
+      2. `CHANGELOG.md`: one `## 1.0.0` entry (first release; the floors and the MixinExtras reason). The date goes in
+         at the release.
+      3. `version=1.0.0`. Test fixtures that say `0.1.0` are inputs, not the build's version: left alone.
+      4. Tests (fabric-side JUnit, next to ReadmeBandsTest): ReadmeBandsTest also holds each NeoForge/Forge cell to
+         its `<loader>_floor.<band>` ("<Loader> <floor> or newer"); `ChangelogTest`: the first `## ` heading of
+         CHANGELOG.md is `## <version>`. Mutation: a floor changed in gradle.properties → red; `version` bumped
+         without a CHANGELOG entry → red; both restored (`cmp`).
+      5. `./gradlew build`; counts read. Stale `commitment-0.1.0+*.jar` in `*/versions/*/build/libs` removed by name
+         after `ls` (the smoke scripts refuse two jars, exit 2; rebuilt from source, nothing lost). Rung 3:
+         `LOADER=fabric NODE=26.3 dev-server-smoke.sh scripts/checks/boot.txt` → `Commitment 1.0.0 loaded`.
+      **Not doing:** Modrinth/CurseForge pages; screenshots; the release itself; editing old TODO history.
+      **Blast radius:** README.md, CHANGELOG.md (new), gradle.properties, two test files; `build/libs` jars (rebuilt).
+      **Rollback:** `git revert` of the F.1 commit.
+- [ ] F.2 **Rungs 5 and 6 on every jar and loader, at 1.0.0.** Owner, session 12 (decisions.md 2026-10-28): the Fabric
+      26.1 jar's range (26.1 – 26.1.2) is proven, not narrowed; Quilt's client runs in a **new, disposable Prism
+      instance** with the owner's account (nothing else in Prism touched).
+      1. **Real Fabric servers** (`server-jars.sh fabric_server <mc> <dir>`: the Fabric installer from
+         maven.fabricmc.net, `.sha1` checked, `server -mcversion <mc> -loader <loader_version> -downloadMinecraft`,
+         stamp file). `dev-server-smoke.sh`: `LOADER=fabric REAL=<minecraft version>` (within the node's
+         `minecraft_range`) boots the **built** jar plus Fabric API in `run/real/fabric/<node>/<mc>/server`; the boot
+         line must name `Minecraft <mc>`. Fabric API per Minecraft: the node's pin on the node's version, else
+         `real_fabric_api.<mc>` (maven-metadata 2026-10-28: 26.1 → 0.145.1+26.1, 26.1.1 → 0.145.4+26.1.1; both
+         declare `~26.1-`). `fabric_api`'s path guard learns `run/real/fabric/<node>/<mc>/server/mods`. `LOADER=quilt
+         REAL=<mc>` the same for Quilt (`run/real/quilt/<node>/<mc>`). Self-test: the old "REAL on Fabric refused"
+         case becomes "REAL outside the node's range refused (exit 2)"; run roots and mirrors.
+      2. **javap first** (it can stop the 26.1/26.1.1 range): MainMixin's and WorldOpenFlowsMixin's targets and every
+         client/server method common code calls through a Stonecutter branch for 26.1.2, compared in the 26.1 and
+         26.1.1 jars. A difference → stop and report.
+      3. **Fabric client on 26.1 and 26.1.1:** `-Pfabric_minecraft.26.1.2=<mc> -Pfabric_api_version.26.1.2=<api>`
+         swaps the 26.1.2 node's Minecraft (default: the band); the client and GameTest run dirs move to
+         `run/fabric/26.1.2@<mc>/` so a 26.1.2 world is never opened by an older game. `runClientGameTest` → `client
+         world check: PASS`, `client gate check: PASS`.
+      4. **Quilt client (Prism):** instance `commitment-quilt-smoke` (new folder under Prism's `instances/`, its own
+         `mmc-pack.json`: Minecraft <mc> + Quilt Loader `quilt_loader_version`; mods: the built Fabric jar + Fabric
+         API). A script copies a disposable world with only the golden guard pack into its saves (as
+         `client-locked-smoke.sh`), `prismlauncher --launch commitment-quilt-smoke --world <copy>`, waits for the
+         locked screen's lines, stops the game PID it started (found by command line naming the instance dir), and
+         Prism's PID if it started it. Plus a plain uncommitted world copy → it opens (a world-joined line). Nodes
+         26.1.2, 26.2, 26.3 and 26.1, 26.1.1.
+      5. **The matrix, at the pins, built jars of 1.0.0** (exit codes and matched lines recorded below):
+         | Loader | Rung 5 (client) | Rung 6 (built jar, real server: `commit-smoke.sh commit-flow.txt locked-config.txt config-restored.txt`) |
+         |---|---|---|
+         | Fabric | `runClientGameTest` 1.21.11, 26.1.2, 26.2, 26.3; step 3 on 26.1, 26.1.1 | REAL= 1.21.11, 26.1, 26.1.1, 26.1.2, 26.2, 26.3 |
+         | Quilt | step 4 on 26.1, 26.1.1, 26.1.2, 26.2, 26.3 | REAL= 26.1, 26.1.1, 26.1.2, 26.2, 26.3 |
+         | NeoForge | `client-locked-smoke.sh` 26.1.2, 26.2, 26.3 | REAL= 26.1.2.122, 26.2.0.93, 26.3.0.95 (floors: F.0) |
+         | Forge | `client-locked-smoke.sh` 26.1.2, 26.2, 26.3 | REAL= 64.1.5, 65.1.5, 66.1.0 (floors: F.0) |
+      **Not doing:** Quilt on 1.21.11 (not claimed); NeoForge/Forge clients below the pin again (F.0 3(c)); multiplayer
+      clients; touching the owner's Prism instances, accounts or settings.
+      **Blast radius:** `run/real/{fabric,quilt}/` (new, git-ignored, rebuilt by the scripts); one new Prism instance
+      folder (the owner's data dir, removed only on the owner's word); dev world copies (removed by marker).
+      **Rollback:** `git revert` of the F.2 commits; `rm -r run/real/<loader>/<node>/<mc>` after `ls`; the Prism
+      instance folder is deleted only on the owner's word, after `ls` shows it's the one this created (marker file).
 
 **Rollback:** Planning: before the commit, `git checkout HEAD -- TODO.md .agent/memory/`;
 after it, `git revert <sha>`. Each stage is its own commits, so `git revert <sha>..<sha>` takes

@@ -474,3 +474,34 @@ covers its pack).
 **Rejected:** Bundling MixinExtras 0.5.5 jar-in-jar (upgrades it for the whole pack). Rewriting MainMixin (common code:
 every pair's server gate re-proven, and another 0.5.4 path might still trip).
 **Affects:** gradle.properties neoforge_floor.26.1.2/26.2, README, TODO F.0
+
+## 2026-10-28 — Stage F: hold every push until the release go; F.2 runs unattended
+**Context:** Session 12: F.0's four commits were local, and Stage F said both "push each green stage" (session 2) and
+"push only on the owner's go". F.2 opens a game window per jar for hours.
+**Choice:** Owner: hold all pushes (F.0 included) until the release go; F.2 may run unattended right after F.1.
+**Why:** The owner's call; nothing on origin until the 1.0.0 release is approved.
+**Rejected:** Pushing F.0 now (no CI, so it would have been safe, but the owner wants Stage F to land together).
+Waiting for the owner before F.2.
+**Affects:** TODO Stage F, state.md
+
+## 2026-10-28 — The Fabric 26.1 jar's range (26.1 – 26.1.2) gets proven, not narrowed
+**Context:** Planning F.2: the Fabric 26.1 band's jar declares `>=26.1 <26.2` (Stage 0, from version metadata), and
+the README promises 26.1 – 26.1.2, but every run so far was on 26.1.2. Releasing it unproven would be a written-down skip.
+**Choice:** Owner (session 12): prove it. A real Fabric server mode for the built jar (Fabric API `smoke_fabric_api`),
+the commit/lock checks on 26.1, 26.1.1 and 26.1.2; the client mixin targets checked with javap in the 26.1 and 26.1.1
+client jars; a real Fabric client on 26.1 if that's possible without a new Stonecutter node. The range stays only if
+all of it is green.
+**Why:** The jar claims those versions; a claim nothing ran is how mcMMO v1.5.1 shipped broken.
+**Rejected:** Narrowing to 26.1.2 only (drops 26.1/26.1.1 players). Server proof alone (the client mixins are where
+versions differ).
+**Affects:** scripts/server-jars.sh, scripts/dev-server-smoke.sh, TODO F.2
+
+## 2026-10-28 — Quilt's client check (rung 5) on a new, disposable Prism instance
+**Context:** Planning F.2: Quilt runs the Fabric jar, but no Quilt client ever ran it (no Quilt dev client in this
+tree; Stage E left Quilt out, decisions 2026-10-27). The release gate wants rung 5 on every loader released.
+**Choice:** Owner (session 12): create one new Quilt instance in the owner's Prism Launcher, used only for this, and
+launch it with the owner's account. Nothing else in Prism is touched: no other instance, no account or settings change.
+**Why:** The only way to a real Quilt client without building a Quilt dev environment.
+**Rejected:** Recording Quilt's client as a skip. A Loom dev client running Quilt Loader (new harness, may not work on
+Quilt's 26.x betas).
+**Affects:** TODO F.2; the owner's Prism data dir (one new instance folder, removed after only on the owner's word)
