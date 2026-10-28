@@ -407,3 +407,12 @@ Forge 64.1.5 refuses `@OnlyIn` mod classes: World No Particles (Fastly Optimised
 `pack-fetch.py drop` (a leaf mod; the pack asks for Forge 64.0.8). Fabric's log prints `(commitment) Commitment:`
 where NeoForge/Forge print `[commitment/]: Commitment:`: match both (`[])]:? `).
 **Affects:** run/packs/*/pack.txt, scripts/pack-smoke.sh, scripts/client-locked-smoke.sh
+
+## 2026-10-27 — A pack client can die of Windows commit exhaustion when another repo's test run is going
+**Symptom:** two NeoForge 26.3 pack runs ended mid-chain with `hs_err_pid*.log`: "insufficient memory for the Java
+Runtime Environment" (an mmap of 1.5 GB, then a malloc of 8 MB), each after Commitment had already matched.
+**Cause:** another session's mcMMO-Singleplayer run (a Fabric client plus four test JVMs) took the machine's commit
+charge; our client reserves an 8 GB heap by default (1/4 of RAM).
+**Rule:** an `hs_err` "insufficient memory" is the environment, not the mod: list java processes by command line,
+wait for the other run to finish, rerun. Never stop another repo's JVMs or `gradlew --stop` (shared daemons).
+**Affects:** scripts/pack-smoke.sh runs

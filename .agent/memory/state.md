@@ -4,26 +4,23 @@
 > cheap to read at the start of every session. History belongs in `decisions.md` and
 > `gotchas.md`; this file only answers "where am I right now?".
 
-**Last updated:** 2026-10-27 (session 10, E.1: 26.3 green on all three loaders)
+**Last updated:** 2026-10-27 (session 10 end: Stage E done)
 **Branch:** `main`, always (decisions.md 2026-10-21). Push each green stage (owner, 2026-10-21).
 
 ## Where we are
 **Commitment**: locks a world's setup after `/commit`, with a 24-hour unlock. Plan in `TODO.md` (Tier 2).
-- Stages 0, A, B, C, D done and pushed. Stage E in progress (TODO E.1), committed locally, **not pushed** (push at
-  the end of the stage).
-- Owner, session 10: NeoForge stays fail-closed on a deleted `config/` (E.1f proves the way back); packs run as real
-  dev clients; Prism 1.21.11 copied as it is today; no Quilt in Stage E (decisions.md 2026-10-27).
-- Pack runs pass (exit 0, commit + 4 reopens): fabric/forge/neoforge 26.3. Findings so far: `*.lock` ignored
-  (Controlify), client logs each locked change. NeoForge 26.3 pack needed Sodium + Reese's swapped (pack.txt).
-- Running at checkpoint: the six 26.1.2/26.2 pairs (`build/pack-smoke-<loader>-<node>.out`).
+- Stages 0, A, B, C, D, E done. 13 nodes; common 301 JUnit per node, fabric 12, GameTests 6 on all 10 pairs.
+- E.1: ten real packs (9 Modrinth: 26.1.2/26.2/26.3 × fabric/neoforge/forge, plus the owner's Prism 1.21.11 copy) each
+  committed and reopened 4× as dev clients, exit 0. Findings fixed: `*.lock`, Crash Assistant localization (IGNORED),
+  `languagereload.json` (NEVER_LOCKED), the client logs each locked change. E.1f: NeoForge's way back after a deleted
+  `config/` is one boot of another world. E.2: the scan is under 1 s on 175 mods.
 
 ## Next
-1. Read the six results; fix and rerun failures. Then the Prism copy: `LOADER=fabric NODE=1.21.11
-   PACK=run/packs/1.21.11/fabric-prism bash scripts/pack-smoke.sh` (expect dev-environment mod failures: report).
-2. E.1f (NeoForge way back: dev server `--world` on an uncommitted world), E.2 (scan time).
-3. Raise with the owner at F: Commitment's loader floor is the dev pin; every NeoForge/Forge pack asks for less.
+1. Stage F (TODO F.1, F.2): README + CHANGELOG, then the release gate on every node × loader. Push only on the owner's go.
+2. **Raise with the owner first:** Commitment's loader floor is the dev pin (`[pin,)`); every NeoForge/Forge Modrinth
+   pack asks for an older loader, and on NeoForge 26.3 updating it breaks the pack's Sodium. Lower the floor (needs a
+   boot on each lower loader) or document "update your loader"?
 - Untested: SettingsLock/CommitmentServer catch blocks around the tick check (TODO C.6).
-- Stale bookkeeping: C.1 checkbox unticked though done; C.2b bullet 3 waits on E.1.
 
 ## How to run things
 - Build: `./gradlew build` (all 13 nodes with 1.21.11; Fabric's `check` includes `runGameTest`). Read counts from

@@ -491,7 +491,7 @@ NeoForge and Forge first** (step C.0), so Proof 2 runs on all nine loader × nod
       `scripts/checks/boot.txt` exit 0 on neoforge 26.1.2, forge 26.2, fabric 26.3 (their run configs changed); no
       GameTest classes in those runs or in the jars. Three traps found on the way (gotchas.md): `always_pass`, filter
       closures not being inputs, `stonecutterGenerateGametest`.
-- [ ] C.1 Heartbeat (sets `commitment:guard alive` every tick while the setup matches), and
+- [x] C.1 Heartbeat (sets `commitment:guard alive` every tick while the setup matches), and
       self-heal at server start (rebuild a missing piece, re-enable a disabled pack). GameTests
       from Proof 2.
       **Design:** common `platform/Platform` (the loader seam: the mod list for `GameEnvironment`), set once by each
@@ -694,7 +694,7 @@ NeoForge and Forge first** (step C.0), so Proof 2 runs on all nine loader × nod
       `ReadmeBandsTest.eachRowNamesItsBandsJars` red ("names a jar the build doesn't make").
       **Noted, not fixed:** the build prints "Deprecated Gradle features were used" from a task at execution time (none
       at configuration, `help --warning-mode all`). Find which before Gradle 10.
-- [ ] C.2b **Save safety** (owner, session 6: "we have to be 100% sure we don't accidentally ruin people's saves").
+- [x] C.2b **Save safety** (owner, session 6: "we have to be 100% sure we don't accidentally ruin people's saves").
       - A JUnit source scan: only `LockStore`, `GuardPack`'s writer and `LockLifter` may call `Files.write|move|delete|
         copy|newOutputStream` or `FileOutputStream`; any other class doing so fails the test (mutation: a stray write
         added elsewhere → red).
@@ -1128,7 +1128,7 @@ NeoForge and Forge first** (step C.0), so Proof 2 runs on all nine loader × nod
 
 ### Stage E: a real modpack (rung 7, on a copy)
 
-- [ ] E.1 Copy the owner's instance (never in place), `/commit`, restart 3× with no changes →
+- [x] E.1 Copy the owner's instance (never in place), `/commit`, restart 3× with no changes →
       zero diffs. Every file that changes on its own goes into the ignore list, with a test.
       Change video, audio and shader settings → still zero diffs; anything that trips goes on
       the never-locked list.
@@ -1249,8 +1249,16 @@ NeoForge and Forge first** (step C.0), so Proof 2 runs on all nine loader × nod
       lands in `run/packs/` (git-ignored, rebuilt from the downloads and the copy) and the dev world copies. Every
       Exclusions entry loosens the lock: each one names the mod and why, and has a test. **Rollback:** `rm -r
       run/packs/<node>/<pair>` (rebuilt by E.1b); `git revert` of the E commits.
-- [ ] E.2 Time the scan on that pack. If it adds more than 2 s to world open, optimize, and
+- [x] E.2 Time the scan on that pack. If it adds more than 2 s to world open, optimize, and
       measure before and after.
+      **Done, session 10:** `WorldGate` logs `Commitment: scanned the setup of <world> in <n> ms (<counts>)` at every
+      check of a committed world (`System.nanoTime`, not a clock read: ClockSourcesTest's pin unchanged), and
+      `pack-smoke.sh` requires it on every reopen. Measured on the pack runs (4 reopens each): the Prism copy (175 mods,
+      7 resource packs, 299 config files) **835–999 ms**; Fabulously Optimized 26.3 (148 mods, 89 config files)
+      338–395 ms; Optimized fps NeoForge 26.3 (27 mods) 119–371 ms. Under 2 s everywhere: no optimization. (The NeoForge
+      run's 5th launch died of a Windows commit-memory refusal, `hs_err_pid19296.log`, after the match, while another
+      session's mcMMO-Singleplayer tests ran; once that ended the rerun was **exit 0**, scans 96–160 ms.) C.2b bullet 3
+      (zero diffs on real packs) is E.1's ten pairs.
 
 ### Stage F: release (the release gate; push only on the owner's go)
 
