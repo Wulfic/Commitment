@@ -1376,7 +1376,8 @@ unattended straight after F.1 (game windows open on the desktop); stop after F.2
          refuses (exit 2) while any Prism is running, starts Prism itself, and closes it after. Two launches, each a
          copy of rung 6's world of that <mc> (made by that Minecraft: no downgrade): (a) with only the golden guard
          pack → the locked screen's lines (as `client-locked-smoke.sh`) and a boot line naming the loader and <mc>;
-         (b) as it is, uncommitted → `scanned the setup of` and `joined the game`, no locked line. Game PID found by
+         (b) as it is, uncommitted → `joined the game` and the boot line, no locked line (an uncommitted world
+         logs no Commitment line: WorldGate scans only committed ones; first draft expected the scan line, wrong). Game PID found by
          its command line naming the instance dir, new since launch; never by name. Copies removed by marker; the
          golden mirror removed by name after a CMTLOCK check. After every run: the owner's
          `%LOCALAPPDATA%\Commitment` must not exist (it didn't, 2026-10-28) or the run fails. Self-test: the copy and
@@ -1410,6 +1411,18 @@ unattended straight after F.1 (game windows open on the desktop); stop after F.2
          matches`); (2) exit 1 (124), a harness race: the boot reached `Done (` but never got `stop` (gotchas
          2026-10-28; fixed, self-test pins it, mutation red); (3) exit 0. The owner's `%LOCALAPPDATA%\Commitment`
          doesn't exist after all 17.
+         **Rung 5 via Prism, session 13: exit 0 on all 7** (`PRISM_LOADER=<l> NODE=<n> MC=<mc>
+         scripts/prism-smoke.sh`; Prism 11.1.1, the owner's account): Quilt 0.31.0-beta.4 on 26.1, 26.1.1, 26.1.2,
+         26.2, 26.3; Fabric 0.19.5 on 26.1, 26.1.1 (`commitment-1.0.0+fabric-mc26.1.jar` on all three 26.1.x). Each,
+         7 matched: locked copy → `locked screen (1 changes)`, `The lock record was damaged or deleted ...`, `no lock
+         record can be trusted (world: missing, mirror: missing, guard pack: present)`, `locked screen shows 3 lines;
+         buttons: Back, Start 24-hour unlock`, `Commitment 1.0.0 loaded on <Loader> <v>, Minecraft <mc>`; open copy
+         → `<player> joined the game` and the boot line, no locked line. The mirror went to
+         `run/prism/appdata/Commitment/locks` (`wrote lock mirror` line; the instance's `Env` took) and was removed;
+         copies removed by marker; no Prism or game JVM left; the owner's `%LOCALAPPDATA%\Commitment` absent. First
+         Quilt 26.1 try: exit 1 on the script's own wrong expectation (the scan line, which uncommitted worlds don't
+         log); fixed, rerun green. Instance left in place: `instances/commitment-smoke` (marker
+         `.commitment-smoke`), removed only on the owner's word.
       **Not doing:** Quilt on 1.21.11 (not claimed); NeoForge/Forge clients below the pin again (F.0 3(c)); multiplayer
       clients; touching the owner's Prism instances, accounts or settings.
       **Blast radius:** `run/real/{fabric,quilt}/` (new, git-ignored, rebuilt by the scripts); one new Prism instance
