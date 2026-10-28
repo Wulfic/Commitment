@@ -302,7 +302,8 @@ launch() {
 			(( verdict == 0 )) && verdict=1
 		fi
 	else
-		for re in "Commitment: $COPY_NAME is committed and its setup matches" "Commitment pack driver: reopen phase over \(reopen done\)"; do
+		for re in "Commitment: scanned the setup of $COPY_NAME in [0-9]+ ms" "Commitment: $COPY_NAME is committed and its setup matches" \
+				"Commitment pack driver: reopen phase over \(reopen done\)"; do
 			if line=$(grep -m1 -E -- "$re" "$tag.log"); then
 				echo "matched $re: $line"
 			else

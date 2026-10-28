@@ -52,6 +52,8 @@ public final class WorldGate {
 		}
 	}
 
+	public static final String SCANNED_LOG = "Commitment: scanned the setup of {} in {} ms ({})";
+
 	private WorldGate() {
 	}
 
@@ -92,12 +94,15 @@ public final class WorldGate {
 			}
 		}
 		Manifest current;
+		long started = System.nanoTime();
 		try {
 			current = ManifestScanner.scan(env);
 		} catch (IOException | RuntimeException e) {
 			Commitment.LOGGER.error("Commitment: can't read the setup of {}: {}", world, e.getMessage());
 			return new Verdict.Failed("can't read the setup: " + e.getMessage());
 		}
+		// What the check adds to opening the world (TODO E.2), in every player's log.
+		Commitment.LOGGER.info(SCANNED_LOG, world.getFileName(), (System.nanoTime() - started) / 1_000_000, current.counts().describe());
 		ManifestDiff diff = record.manifest().diff(current);
 		if (!diff.isEmpty()) {
 			changes.addAll(diff.lines(MAX_LINES - changes.size()));
