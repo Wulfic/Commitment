@@ -4,26 +4,24 @@
 > cheap to read at the start of every session. History belongs in `decisions.md` and
 > `gotchas.md`; this file only answers "where am I right now?".
 
-**Last updated:** 2026-10-28 (session 12: F.1 done, F.2 under way)
+**Last updated:** 2026-10-28 (session 13: F.2 done; waiting for the owner's release go)
 **Branch:** `main`, always (decisions.md 2026-10-21). Push each green stage (owner, 2026-10-21).
 
 ## Where we are
 **Commitment**: locks a world's setup after `/commit`, with a 24-hour unlock. Plan in `TODO.md` (Tier 2).
-- Stages 0, A, B, C, D, E done. 13 nodes; common 301 JUnit per node, fabric 12, GameTests 6 on all 10 pairs.
+- Stages 0, A, B, C, D, E done. 13 nodes; common 301 JUnit per node, fabric 18, GameTests 6 on all 10 pairs.
 - E.1: ten real packs (9 Modrinth: 26.1.2/26.2/26.3 × fabric/neoforge/forge, plus the owner's Prism 1.21.11 copy) each
   committed and reopened 4× as dev clients, exit 0. Findings fixed: `*.lock`, Crash Assistant localization (IGNORED),
   `languagereload.json` (NEVER_LOCKED), the client logs each locked change. E.1f: NeoForge's way back after a deleted
   `config/` is one boot of another world. E.2: the scan is under 1 s on 175 mods.
 
 ## Next
-1. Stage F. **Owner, session 12: hold ALL pushes (F.0, F.1 too: local only) until the release go.** F.0, F.1 done
-   (`a519aee`: README, CHANGELOG, version 1.0.0). **F.2 now, unattended** (TODO F.2 plan): real Fabric/Quilt servers
-   (`REAL=<minecraft>`), the Fabric 26.1 jar proven on 26.1/26.1.1 (owner: prove, not narrow), Quilt's client in a
-   NEW Prism instance `commitment-quilt-smoke` (owner OK'd; never touch the owner's instances `1.21.11`, `26.3`).
-   **Uncommitted:** step 1 harness (scripts/server-jars.sh, dev-server-smoke.sh, gradle.properties keys): self-test
-   green, mutation-checked, no real boot yet. Next: commit it, then `LOADER=fabric NODE=26.1.2 REAL=26.1
-   commit-smoke.sh commit-flow.txt locked-config.txt config-restored.txt`. Step 2 (javap/refcheck) done, clean.
-   Then stop for the release go. The release is 10 jars (4 Fabric, 3 NeoForge, 3 Forge), not 13.
+1. Stage F. **Owner, session 12: hold ALL pushes until the release go.** F.0, F.1, F.2 done, all local (`git log
+   origin/main..`). F.2: rung 6 green on 17 real servers, rung 5 green on 17 clients (7 via Prism: Quilt 26.1-26.3,
+   Fabric 26.1/26.1.1 with the shipped jar; owner ruling decisions.md 2026-10-28). **Stop: the owner's release go**
+   next, then the release (10 jars: 4 Fabric, 3 NeoForge, 3 Forge; GitHub Release only; CHANGELOG date at release).
+   The release gate must be rerun if any code changes before then.
+   Prism instance `commitment-smoke` (marker `.commitment-smoke`) is left in the owner's Prism: removed only on their word.
 - Untested: SettingsLock/CommitmentServer catch blocks around the tick check (TODO C.6).
 
 ## How to run things
@@ -42,6 +40,8 @@
 - Real loader server: `LOADER=<neoforge|forge> NODE=.. REAL=<loader version> bash scripts/commit-smoke.sh ...` (built
   jar, `run/real/<loader>/<node>/<version>/`). Client on another loader build: `LOADER_VERSION=<v> client-locked-smoke.sh`.
   GameTests on one build: `-P<loader>_version.<node>=<v>`; `-Pgametest_max_parallel=1` if Windows refuses commit memory.
+- Prism client (real Quilt/Fabric client, shipped jar): `PRISM_LOADER=<fabric|quilt> NODE=.. MC=.. bash
+  scripts/prism-smoke.sh` after rung 6 of that MC (uses its world + Fabric API); refuses while any Prism runs.
 - Tamper matrix: `bash scripts/tamper-matrix.sh [loader:node ...]` → `build/tamper-matrix.md`; Quilt needs the built
   Fabric jar. `tamper.sh` backups live in `run/<loader>/<node>/tamper-backup/` (never auto-deleted).
 

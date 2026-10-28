@@ -1350,7 +1350,9 @@ unattended straight after F.1 (game windows open on the desktop); stop after F.2
       **Not doing:** Modrinth/CurseForge pages; screenshots; the release itself; editing old TODO history.
       **Blast radius:** README.md, CHANGELOG.md (new), gradle.properties, two test files; `build/libs` jars (rebuilt).
       **Rollback:** `git revert` of the F.1 commit.
-- [ ] F.2 **Rungs 5 and 6 on every jar and loader, at 1.0.0.** Owner, session 12 (decisions.md 2026-10-28): the Fabric
+- [x] F.2 **Rungs 5 and 6 on every jar and loader, at 1.0.0.** **Done, session 13: all green** (rung 6: 17 real
+      servers; rung 5: 7 Prism clients, 4 Fabric client GameTests, 6 NeoForge/Forge locked-screen clients; details
+      under the matrix). Owner, session 12 (decisions.md 2026-10-28): the Fabric
       26.1 jar's range (26.1 – 26.1.2) is proven, not narrowed; Quilt's client runs in a **new, disposable Prism
       instance** with the owner's account (nothing else in Prism touched).
       1. **Real Fabric servers** (`server-jars.sh fabric_server <mc> <dir>`: the Fabric installer from
@@ -1423,6 +1425,11 @@ unattended straight after F.1 (game windows open on the desktop); stop after F.2
          Quilt 26.1 try: exit 1 on the script's own wrong expectation (the scan line, which uncommitted worlds don't
          log); fixed, rerun green. Instance left in place: `instances/commitment-smoke` (marker
          `.commitment-smoke`), removed only on the owner's word.
+         **Rung 5 at the pins, session 13: exit 0 on all 10.** `./gradlew :fabric:<n>:runClientGameTest` on 1.21.11,
+         26.1.2, 26.2, 26.3: `BUILD SUCCESSFUL`, `client world check: PASS`, `client gate check: PASS` each.
+         `LOADER=<l> NODE=<n> client-locked-smoke.sh` on NeoForge and Forge 26.1.2, 26.2, 26.3: `client-locked-smoke:
+         PASS`, 5 matched each, boot lines `Commitment 1.0.0 loaded on NeoForge 26.1.2.122` / `26.2.0.93` /
+         `26.3.0.95`, `on Forge 64.1.5` / `65.1.5` / `66.1.0`; copies and mirrors removed.
       **Not doing:** Quilt on 1.21.11 (not claimed); NeoForge/Forge clients below the pin again (F.0 3(c)); multiplayer
       clients; touching the owner's Prism instances, accounts or settings.
       **Blast radius:** `run/real/{fabric,quilt}/` (new, git-ignored, rebuilt by the scripts); one new Prism instance
