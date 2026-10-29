@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.0.1 (2026-10-29)
+
+No change to the mod: jar names and how releases are made.
+
+- Jar names say which loaders and Minecraft versions each jar runs on: `fabric-quilt` for the 26.x Fabric jars,
+  which Quilt runs too, and a range where a jar runs on several versions, as in
+  `commitment-1.0.1+fabric-quilt-mc26.1-26.1.2.jar`. The 1.21.11 jar stays `fabric-mc1.21.11` (Fabric only).
+- Releases are built and published by GitHub Actions, and only the newest release is kept.
+- The README explains how to remove Commitment from a committed world in an emergency.
+
 ## 1.0.0 (2026-10-29)
 
 The first release.

@@ -4,27 +4,25 @@
 > cheap to read at the start of every session. History belongs in `decisions.md` and
 > `gotchas.md`; this file only answers "where am I right now?".
 
-**Last updated:** 2026-10-29 (session 17: README emergency removal; 1.0.0 released in session 16)
-**Branch:** `main`, always (decisions.md 2026-10-21). Push each green stage (owner, 2026-10-21); Stage F's push hold
-(decisions 2026-10-28) ended with the release.
+**Last updated:** 2026-10-29 (session 18: 1.0.1, new jar names, release workflow)
+**Branch:** `main`, always (decisions.md 2026-10-21). **A push to `main` can release now**: `.github/workflows/release.yml`
+publishes `v<version>` when gradle.properties' version has none, then deletes every older release and tag.
 
 ## Where we are
 **Commitment**: locks a world's setup after `/commit`, with a 24-hour unlock. Plan in `TODO.md` (Tier 2).
-- **1.0.0 is out**: https://github.com/Wulfic/Commitment/releases/tag/v1.0.0 (tag `v1.0.0` on `c0f724a`), 10 mod
-  jars, published and Latest; the downloaded assets match F.4's pre-gate SHA-256 (listed in TODO F.5).
+- **1.0.1** (TODO "1.0.1: jar names ..."): jars named `commitment-<v>+<fabric-quilt|fabric|neoforge|forge>-mc<LOW[-HIGH]>`
+  (`fabric-quilt-mc26.1-26.1.2`; 1.21.11 stays `fabric-mc1.21.11`, no Quilt proven there). No mod code changed; owner
+  waived the release gate for it. CI publishes on the version bump and prunes older releases + tags (owner's choice).
+- v1.0.0's release and tag are deleted by that run; the backup is `run/release-backup/v1.0.0/` (10 jars SHA-256 checked,
+  notes, tag facts) and the local annotated tag `v1.0.0` (on `c0f724a`).
+- Builds reproduce byte for byte across this machine and CI's Linux runner (CI's 1.0.0 jars = F.5's hashes).
 - Stages 0, A-F done. 13 nodes; common 306 JUnit per node, fabric 22, GameTests 6 on all 10 pairs.
-- After 1.0.0 (2026-10-29): README "Emergency removal" (remove jar + guard pack; record + mirror `<lock id>.dat` too
-  so a reinstall doesn't relock), pinned by `fabric/.../lock/ReadmeRemovalTest`. On `main`, not in a release.
-- E.1: ten real packs (9 Modrinth: 26.1.2/26.2/26.3 × fabric/neoforge/forge, plus the owner's Prism 1.21.11 copy) each
-  committed and reopened 4× as dev clients, exit 0. Findings fixed: `*.lock`, Crash Assistant localization (IGNORED),
-  `languagereload.json` (NEVER_LOCKED), the client logs each locked change. E.1f: NeoForge's way back after a deleted
-  `config/` is one boot of another world. E.2: the scan is under 1 s on 175 mods.
 
 ## Next
-1. **Nothing planned past 1.0.0: the owner picks.** Known loose ends: the smoke harness says exit 1 for an
-   `internet time` refusal caused by the network, where 2 ("nothing proven") is true (gotchas 2026-10-28);
-   Modrinth/CurseForge weren't in scope. Any fix goes to a 1.0.x with its own release gate (a jar's hashes go in TODO).
-2. Prism's `commitment-smoke` instance was removed (owner's word); `prism-smoke.sh` recreates it on its next run.
+1. **Owner:** AGENTS.md says frozen bands' "releases stay up"; pruning now deletes them (decisions 2026-10-29).
+2. Known loose ends: the smoke harness says exit 1 for an `internet time` refusal caused by the network (2 is true,
+   gotchas 2026-10-28); Modrinth/CurseForge weren't in scope.
+3. Any next release: bump `version` + CHANGELOG entry; the release gate before that push (AGENTS.md), unless waived.
 
 ## How to run things
 - Build: `./gradlew build` (all 13 nodes with 1.21.11; Fabric's `check` includes `runGameTest`). Read counts from
