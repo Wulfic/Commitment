@@ -1677,8 +1677,15 @@ setup-java v6, gradle/actions v6, upload-artifact v7, download-artifact v8. Repo
       `run/release-backup/v1.0.0/` (git-ignored), `sha256sum -c` against F.5's list. The local tag `v1.0.0` stays.
       **Done:** 10 jars `sha256sum -c` against F.5's hashes: 10 OK; `notes.md` byte-identical to the published body;
       `release.json`; `tag.txt` (annotated, object `c0f724a`, tagger wulfic, "Commitment 1.0.0").
-- [ ] 8. `version=1.0.1`, CHANGELOG 1.0.1, build + tests green; push 2. CI publishes v1.0.1 (10 assets, hashes
+- [x] 8. `version=1.0.1`, CHANGELOG 1.0.1, build + tests green; push 2. CI publishes v1.0.1 (10 assets, hashes
       checked) and deletes v1.0.0's release and tag. Check: `gh release list`, the assets, the remote tags.
+      **Done:** local `:fabric:{26.1.2,26.3}:test` ChangelogTest/BandLabelTest/ReadmeBandsTest green at 1.0.1;
+      `./gradlew assemble` exit 0, ten local 1.0.1 hashes kept. Push `03b1bb4..ee43814`; **CI run 40836937147 green**:
+      published **v1.0.1** (tag on `ee43814`), `draft=false`, `pre=false`, Latest, 10 assets, the check step's
+      `sha256sum -c` OK; prune: `keeping v1.0.1 (10 assets); 1 older to delete`, `deleting v1.0.0 (commit c0f724a...)`,
+      `deleted 1 of 1, each checked gone; v1.0.1 is still there`. Checked from here: `gh release list` = v1.0.1 only;
+      remote v-tags = `v1.0.1` only; the ten downloaded jars' SHA-256 **identical to the local 1.0.1 build** (10/10);
+      notes = the CHANGELOG entry. Local tag `v1.0.0` and `run/release-backup/v1.0.0/` kept (the undo above).
 **Not doing:** the release gate matrix (owner waived it for 1.0.1); Quilt on 1.21.11; a Quilt jar; Modrinth/CurseForge;
 changing AGENTS.md's "frozen bands' releases stay up" (it now conflicts with pruning: the owner's call).
 **Blast radius:** public: `main`, the v1.0.0 release and tag (deleted by CI on push 2: 10 jars with 1-2 downloads
