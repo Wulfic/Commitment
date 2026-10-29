@@ -465,3 +465,18 @@ The mod did what it should (refuse the unlock without internet time); every othe
 **Rule:** an `internet time` refusal in a smoke log is the environment, not the mod: probe the three hosts, then rerun.
 The harness can't tell the two apart yet, so it says 1 where 2 ("nothing proven") is the truth.
 **Affects:** scripts/checks/commit-flow.txt, scripts/dev-server-smoke.sh (verdict)
+
+## 2026-10-29 — The release gate's jar hashes lived only in a session scratchpad
+**Symptom:** F.5: state.md said "SHA-256 in TODO F.4", but TODO held only the jars' build times. The list F.4 checked
+(`jars-before.sha256`) sat in session 15's scratchpad, found only by a slow grep across every session's temp folder.
+**Cause:** the gate wrote its proof to the scratchpad and the TODO entry summarized it ("unchanged across the gate")
+instead of copying it. Scratchpads are per session and get cleaned.
+**Rule:** the hashes of the jars a gate proves go into TODO.md in the same commit that records the gate. mtimes are a
+fallback, not a proof. F.5's entry now holds 1.0.0's ten hashes.
+**Affects:** TODO.md (release gate entries), dev-server skill Part D
+
+## 2026-10-29 — A GitHub release body renders every newline as a line break
+**Symptom:** CHANGELOG.md is hard-wrapped at 120 columns; pasted as release notes it breaks lists mid-sentence.
+**Rule:** `--notes-file` gets the entry's body with continuation lines (two-space indent) joined to their bullet;
+check the alphanumeric content is identical (`tr -cd '[:alnum:]' | md5sum` on both). CHANGELOG.md itself stays wrapped.
+**Affects:** releases (git-github skill)

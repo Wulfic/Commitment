@@ -1515,9 +1515,30 @@ instance. Stop after each of F.3, F.4, F.5.
       rebuild; touching the other repo's Gradle daemon (PID 22608).
       **Blast radius:** dev/real world copies under `run/` (removed by the scripts' markers), the `commitment-smoke`
       Prism instance (rewritten per run, as F.2). **Rollback:** none needed: nothing tracked changes but this file.
-- [ ] F.5 **Release 1.0.0.** CHANGELOG date; push `main`; tag; `gh release create` with the 10 mod jars and the
+- [x] F.5 **Release 1.0.0.** CHANGELOG date; push `main`; tag; `gh release create` with the 10 mod jars and the
       CHANGELOG entry as notes, published; check the release lists 10 assets with matching SHA-256. Then remove
       `instances/commitment-smoke` from Prism (marker checked, Prism closed).
+      **Done, session 16 (owner's go confirmed in session):** `main` pushed `8ca7e74..c0f724a` (fast-forward, dry-run
+      first); tag `v1.0.0` (annotated `04e661c`, on `c0f724a`) pushed; **released**
+      https://github.com/Wulfic/Commitment/releases/tag/v1.0.0 at 2026-10-29T05:18:41Z: `draft=false`,
+      `prerelease=false`, Latest, 10 assets `uploaded`. All ten downloaded back and `sha256sum -c` against F.4's
+      pre-gate list: **10 OK, exit 0**. Notes: the 1.0.0 entry's body with its wrapped lines joined (a release body
+      renders each newline as a break); alphanumeric content checked identical. Prism: no Prism process; the folder's
+      marker read; 135 files, 14.6 MB; `Remove-Item -LiteralPath` of that folder; the owner's `1.21.11` and `26.3`
+      instances still there; `%LOCALAPPDATA%\Commitment` absent. **Stage F done.**
+      SHA-256 of the released jars (= F.4's, 19:03):
+      ```
+      e75c03832e6e45156ea161e89ef493e345b5da9e720735a7d501e6ddad20afb9  commitment-1.0.0+fabric-mc1.21.11.jar
+      3780442acc606468021682dca5324b46d57618b7b18d8c9c9f395c861878ad59  commitment-1.0.0+fabric-mc26.1.jar
+      db06e84464dc5117cc13fcd63c92a0bf4310657f3b24d1a06d62886155817735  commitment-1.0.0+fabric-mc26.2.jar
+      b77d5942c460e025e94db4caaee950856d76be52b2257586c1494e388e761fd7  commitment-1.0.0+fabric-mc26.3.jar
+      3620afb7600c11d2d9a3f75642554f9ad63ef171f8b1d1fb130069d925b9039e  commitment-1.0.0+forge-mc26.1.2.jar
+      68e8a68ddaf6efd5b6dc576ed0e2ba2885ffc75377c0d29d1ed2063b893e1527  commitment-1.0.0+forge-mc26.2.jar
+      763bfec8a1d1707992d018cc40cc6b3ad42f2880cac8e8bfe5308ee45d650f7e  commitment-1.0.0+forge-mc26.3.jar
+      ce35b70c8b05e8ea653f06adc4073ff96943760bad5a8bf5e7de822a86895a12  commitment-1.0.0+neoforge-mc26.1.2.jar
+      6b137be80a7a8d228a066390ac0c8e315779d179966de5df4399e71e13426c96  commitment-1.0.0+neoforge-mc26.2.jar
+      d3565eb1bcf55848326ed9dd5ddf8928419c49b6ee3dce9b59b7f55faa9fa10d  commitment-1.0.0+neoforge-mc26.3.jar
+      ```
       **Pre-flight, session 16:** origin has no tags and no releases; `Wulfic/Commitment` is public, no
       `.github/workflows` (nothing releases on push); `main` 11 ahead of origin, fast-forward; no secret pattern in
       `git diff origin/main HEAD`, no `.env`/`.mcp.json` tracked. The ten jars' mtimes are 18:21:22.18-18:21:53.28,

@@ -4,23 +4,25 @@
 > cheap to read at the start of every session. History belongs in `decisions.md` and
 > `gotchas.md`; this file only answers "where am I right now?".
 
-**Last updated:** 2026-10-28 (session 15: F.4 done, all 40 gate runs green; F.5, the release, next)
-**Branch:** `main`, always (decisions.md 2026-10-21). Push each green stage (owner, 2026-10-21).
+**Last updated:** 2026-10-29 (session 16: F.5 done, **1.0.0 released**; Stage F done)
+**Branch:** `main`, always (decisions.md 2026-10-21). Push each green stage (owner, 2026-10-21); Stage F's push hold
+(decisions 2026-10-28) ended with the release.
 
 ## Where we are
 **Commitment**: locks a world's setup after `/commit`, with a 24-hour unlock. Plan in `TODO.md` (Tier 2).
-- Stages 0, A, B, C, D, E done. 13 nodes; common 306 JUnit per node, fabric 18, GameTests 6 on all 10 pairs.
+- **1.0.0 is out**: https://github.com/Wulfic/Commitment/releases/tag/v1.0.0 (tag `v1.0.0` on `c0f724a`), 10 mod
+  jars, published and Latest; the downloaded assets match F.4's pre-gate SHA-256 (listed in TODO F.5).
+- Stages 0, A-F done. 13 nodes; common 306 JUnit per node, fabric 18, GameTests 6 on all 10 pairs.
 - E.1: ten real packs (9 Modrinth: 26.1.2/26.2/26.3 × fabric/neoforge/forge, plus the owner's Prism 1.21.11 copy) each
   committed and reopened 4× as dev clients, exit 0. Findings fixed: `*.lock`, Crash Assistant localization (IGNORED),
   `languagereload.json` (NEVER_LOCKED), the client logs each locked change. E.1f: NeoForge's way back after a deleted
   `config/` is one boot of another world. E.2: the scan is under 1 s on 175 mods.
 
 ## Next
-1. Stage F. **Owner, session 14 (decisions.md 2026-10-28): release go given**, after F.3 and F.4: **both done** (F.4:
-   40/40 green on the jars built 18:21, SHA-256 in TODO F.4 unchanged across the gate; one network-blip rerun).
-   Next F.5: CHANGELOG date, push `main`, tag, publish the GitHub Release directly, 10 mod jars, no sources (check
-   10 assets, SHA-256); then remove Prism's `commitment-smoke` instance (marker `.commitment-smoke`, Prism closed).
-   **Don't rebuild before F.5**: the gate proved these exact jars. Stop after F.5 for the owner.
+1. **Nothing planned past 1.0.0: the owner picks.** Known loose ends: the smoke harness says exit 1 for an
+   `internet time` refusal caused by the network, where 2 ("nothing proven") is true (gotchas 2026-10-28);
+   Modrinth/CurseForge weren't in scope. Any fix goes to a 1.0.x with its own release gate (a jar's hashes go in TODO).
+2. Prism's `commitment-smoke` instance was removed (owner's word); `prism-smoke.sh` recreates it on its next run.
 
 ## How to run things
 - Build: `./gradlew build` (all 13 nodes with 1.21.11; Fabric's `check` includes `runGameTest`). Read counts from
