@@ -1518,6 +1518,31 @@ instance. Stop after each of F.3, F.4, F.5.
 - [ ] F.5 **Release 1.0.0.** CHANGELOG date; push `main`; tag; `gh release create` with the 10 mod jars and the
       CHANGELOG entry as notes, published; check the release lists 10 assets with matching SHA-256. Then remove
       `instances/commitment-smoke` from Prism (marker checked, Prism closed).
+      **Pre-flight, session 16:** origin has no tags and no releases; `Wulfic/Commitment` is public, no
+      `.github/workflows` (nothing releases on push); `main` 11 ahead of origin, fast-forward; no secret pattern in
+      `git diff origin/main HEAD`, no `.env`/`.mcp.json` tracked. The ten jars' mtimes are 18:21:22.18-18:21:53.28,
+      F.4's window; nothing but TODO.md and `.agent/` changed since F.3 (`9490064`). **`sha256sum -c` against F.4's
+      own list (`jars-before.sha256`, written 19:03, before the gate): 10 OK, exit 0.** The hashes are below.
+      `gh` logged in as Wulfic. Prism closed; `commitment-smoke` (15 MB) has `.commitment-smoke` ("made by
+      scripts/prism-smoke.sh"); `instgroups.json` has no groups, so nothing references it.
+      1. `CHANGELOG.md`: `## 1.0.0` → `## 1.0.0 (2026-10-29)` (ChangelogTest reads up to the first space).
+         `./gradlew :fabric:26.3:test --tests '*ChangelogTest'` exit 0, count read; the jars' hashes unchanged after.
+         Commit with this TODO entry. **Done:** exit 0, `TEST-...ChangelogTest.xml` written 01:17 this run: tests 2,
+         failures 0, errors 0; afterwards `sha256sum -c` 10 OK.
+      2. F.4's list copied to `scratchpad/f5-jars.sha256`; its ten hashes go in this entry after the release.
+      3. `git push origin main` (fast-forward). `git tag -a v1.0.0 -m "Commitment 1.0.0"` on that commit (the
+         sibling repos' `v<version>`); `git push origin v1.0.0`.
+      4. `gh release create v1.0.0 --verify-tag --title "Commitment 1.0.0" --notes-file <the 1.0.0 entry's body>`
+         with the ten jars; published, marked latest.
+      5. `gh release view v1.0.0 --json isDraft,assets`: not a draft, exactly the ten names; download them into the
+         scratchpad and `sha256sum -c f5-jars.sha256`.
+      6. Prism: closed (by command line), marker read, `ls`, then `rm -r` of that one instance folder.
+      **Not doing:** Modrinth or CurseForge; sources or `common` jars; a rebuild; any other Prism instance.
+      **Blast radius:** public: `main` on origin, tag `v1.0.0`, the release (players can download it). Local: one
+      Prism instance folder (the owner's data dir). **Rollback:** a bad asset: `gh release upload --clobber` or
+      `gh release delete-asset`; a bad release: `gh release delete v1.0.0` and `git push origin :refs/tags/v1.0.0`
+      **only on the owner's word** (deleting a published tag is an absolute stop); pushed commits: `git revert`.
+      The Prism instance: `prism-smoke.sh` rebuilds it (it downloads its loader and Minecraft again).
 
 **Rollback:** Planning: before the commit, `git checkout HEAD -- TODO.md .agent/memory/`;
 after it, `git revert <sha>`. Each stage is its own commits, so `git revert <sha>..<sha>` takes
