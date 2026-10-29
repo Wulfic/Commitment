@@ -1571,6 +1571,37 @@ a stage back. For a world committed during development: `/unlock` and wait, or d
 `<world>/data/commitment.dat`, `<world>/datapacks/commitment_guard.zip` and the mirror's
 `<lock id>.dat`. Those are the only files Commitment ever writes, and nothing vanilla is changed.
 
+## README: emergency removal (Tier 1, planned 2026-10-29)
+
+**Goal:** the README tells a player how to force Commitment out of a committed world when the 24-hour unlock can't
+be used (no internet, a crash, a bug), without the world locking again if Commitment is reinstalled later.
+**Approach:** a numbered "Emergency removal" subsection under "Getting out", from the code, not the README's own
+claims: remove the jar, delete the guard pack (`GuardPack.FILE`); to stay unlocked on a reinstall, also delete
+`LockStore.WORLD_RECORD` and the mirror's `<lock id>.dat`. The lock id is the `lock=` line of the pack's
+`commitment.lock` entry. All three gone gives `Loaded.Uncommitted` (`LockStore.load`); keep the mirror and
+`scanMirror` finds the world again by seed and folder name. A test pins the section's paths to the constants, since a
+renamed file would silently break the instructions players need most.
+**Not doing:** a removal command or script in the mod; changing the bypass bar; Modrinth/CurseForge pages; a release.
+**Blast radius:** none in the repo: README additive, plus one new test. The instructions tell players to delete
+three files of their own, so they say to back up the world first.
+**Proof:** JUnit `ReadmeRemovalTest` (fabric, every node), mutation-checked by breaking a path in the README.
+Behaviour is already proven live: tamper chain boot 14 (mod and pack gone, the world opens, no guard), boots 05/06
+(a deleted record comes back from the mirror). No gameplay change, so no new dev-server run.
+
+- [x] 1. `README.md`: "### Emergency removal" under "Getting out"; point the "Don't remove Commitment" paragraph and
+      "What still works" at it
+- [x] 2. `fabric/src/test/java/com/wulfic/commitment/lock/ReadmeRemovalTest.java` (the lock package, to reach
+      `MirrorDir.resolve` and `GuardPack.MARKER_ENTRY`): the section names `GuardPack.FILE`, `LockStore.WORLD_RECORD`,
+      the marker entry, `lock=`, `<lock id>.dat` and all four mirror folders, each derived from the code
+- [x] 3. `:fabric:26.3:test --tests ...ReadmeRemovalTest`: 4/4 passed. Mutation: README's Windows mirror folder
+      `locks` → `lock` and `lock=` → `id=` made exactly the two matching tests fail with "doesn't name ...", README
+      restored from a copy (`cmp` identical), green again in the full build. `./gradlew build` first run: exit 1 from
+      Windows refusing commit memory (errno 1455, the daemon died, an mcMMO build was running alongside), not a test.
+      Rerun `./gradlew build -Pgametest_max_parallel=1`: exit 0, BUILD SUCCESSFUL; read from the XML: common 306 per
+      node (unchanged), fabric 22 per node (18 + the 4 new), GameTests 6/6 on all 10 pairs, 0 failures
+
+**Rollback:** `git revert <commit>`.
+
 ## Done
 
 _Move completed tasks here, or delete them once they're in the git history._

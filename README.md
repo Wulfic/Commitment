@@ -62,7 +62,37 @@ internet connection, an unlock can't start or finish, and the world stays locked
 
 **Don't remove Commitment from a committed world.** The world still opens, but a datapack Commitment left in it blinds
 and freezes every player, with "This world is committed. Commitment is missing: reinstall it to play". Nothing in the
-world is damaged, and the effects wear off three seconds after Commitment is back.
+world is damaged, and the effects wear off three seconds after Commitment is back. If you have to get it out anyway,
+see [Emergency removal](#emergency-removal).
+
+### Emergency removal
+
+If the unlock can't help (no internet connection, a crash, a bug in Commitment) and you need the world back now, you
+can force Commitment out by hand. This skips the 24-hour wait, which is the whole point of Commitment, so keep it for
+emergencies.
+
+1. Close Minecraft, or stop the server.
+2. **Back up the world folder**: `saves/<world>` in singleplayer, or the server's world folder (`world` unless
+   `level-name` in `server.properties` says otherwise). The steps below delete files.
+3. Open `<world>/datapacks/commitment_guard.zip` with any zip tool, open the `commitment.lock` file inside it, and
+   write down its `lock=` line. That's the world's lock id, and step 7 needs it.
+4. Take the Commitment jar out of the `mods` folder of your game, instance or server.
+5. Delete `<world>/datapacks/commitment_guard.zip`.
+
+The world now opens normally: without the jar nothing rebuilds the pack, and Minecraft drops it from the world's
+datapack list by itself. The lock is still recorded, though, so putting Commitment back locks the world again, with
+any unlock timer where it was. To be rid of the lock for good, also delete:
+
+6. `<world>/data/commitment.dat`, the world's lock record.
+7. `<lock id>.dat`, its copy outside the game folder: in `%LOCALAPPDATA%\Commitment\locks` on Windows,
+   `~/Library/Application Support/Commitment/locks` on macOS, and `$XDG_DATA_HOME/commitment/locks` (or
+   `~/.local/share/commitment/locks`) on Linux.
+
+Delete both: Commitment restores either copy from the other, and it finds the copy outside the game folder by the
+world's seed and folder name even with the pack and the record gone. With all three files gone, the world counts as
+never committed. They're the same three files Commitment deletes itself when a lock lifts. If you lost the lock id,
+delete every `.dat` file in that folder: each other committed world writes its own copy back the next time it opens,
+as long as its `data/commitment.dat` is still there.
 
 ## What it can't stop
 
@@ -84,8 +114,9 @@ You own every file, so Commitment can make getting around it a chore, not imposs
 | Edit `server.properties` on a committed server | The server logs the changed keys and stops |
 
 **What still works**, and is meant to: removing Commitment **and** deleting `datapacks/commitment_guard.zip` from the
-world folder. So does rewriting both copies of the lock record with a valid signature, which takes the key out of a
-decompiled jar. Either takes knowing where the world folder is and what to delete, which is the bar Commitment sets.
+world folder ([Emergency removal](#emergency-removal) has the steps). So does rewriting both copies of the lock
+record with a valid signature, which takes the key out of a decompiled jar. Either takes knowing where the world
+folder is and what to delete, which is the bar Commitment sets.
 
 Commitment never writes to `level.dat` or any other file of the game's. Everything it adds is three small files: the
 lock record, its copy outside the game folder, and the guard datapack. Minecraft records the guard as enabled in its

@@ -4,7 +4,7 @@
 > cheap to read at the start of every session. History belongs in `decisions.md` and
 > `gotchas.md`; this file only answers "where am I right now?".
 
-**Last updated:** 2026-10-29 (session 16: F.5 done, **1.0.0 released**; Stage F done)
+**Last updated:** 2026-10-29 (session 17: README emergency removal; 1.0.0 released in session 16)
 **Branch:** `main`, always (decisions.md 2026-10-21). Push each green stage (owner, 2026-10-21); Stage F's push hold
 (decisions 2026-10-28) ended with the release.
 
@@ -12,7 +12,9 @@
 **Commitment**: locks a world's setup after `/commit`, with a 24-hour unlock. Plan in `TODO.md` (Tier 2).
 - **1.0.0 is out**: https://github.com/Wulfic/Commitment/releases/tag/v1.0.0 (tag `v1.0.0` on `c0f724a`), 10 mod
   jars, published and Latest; the downloaded assets match F.4's pre-gate SHA-256 (listed in TODO F.5).
-- Stages 0, A-F done. 13 nodes; common 306 JUnit per node, fabric 18, GameTests 6 on all 10 pairs.
+- Stages 0, A-F done. 13 nodes; common 306 JUnit per node, fabric 22, GameTests 6 on all 10 pairs.
+- After 1.0.0 (2026-10-29): README "Emergency removal" (remove jar + guard pack; record + mirror `<lock id>.dat` too
+  so a reinstall doesn't relock), pinned by `fabric/.../lock/ReadmeRemovalTest`. On `main`, not in a release.
 - E.1: ten real packs (9 Modrinth: 26.1.2/26.2/26.3 × fabric/neoforge/forge, plus the owner's Prism 1.21.11 copy) each
   committed and reopened 4× as dev clients, exit 0. Findings fixed: `*.lock`, Crash Assistant localization (IGNORED),
   `languagereload.json` (NEVER_LOCKED), the client logs each locked change. E.1f: NeoForge's way back after a deleted
