@@ -4,7 +4,7 @@
 > cheap to read at the start of every session. History belongs in `decisions.md` and
 > `gotchas.md`; this file only answers "where am I right now?".
 
-**Last updated:** 2026-10-28 (session 14: F.3 done; F.4, the release gate rerun, next)
+**Last updated:** 2026-10-28 (session 15: F.4 done, all 40 gate runs green; F.5, the release, next)
 **Branch:** `main`, always (decisions.md 2026-10-21). Push each green stage (owner, 2026-10-21).
 
 ## Where we are
@@ -16,10 +16,11 @@
   `config/` is one boot of another world. E.2: the scan is under 1 s on 175 mods.
 
 ## Next
-1. Stage F. **Owner, session 14 (decisions.md 2026-10-28): release go given**, after F.3 (C.6's catches tested: done)
-   and F.4 (the whole release gate rerun on F.3's jars: F.2's 17 servers + 17 clients, F.0's 6 floor servers). Then
-   F.5: publish the GitHub Release directly, 10 mod jars, no sources; then remove Prism's `commitment-smoke` instance
-   (marker `.commitment-smoke`). **Pushes still held until F.5.** Stop after each of F.3, F.4, F.5 for the owner.
+1. Stage F. **Owner, session 14 (decisions.md 2026-10-28): release go given**, after F.3 and F.4: **both done** (F.4:
+   40/40 green on the jars built 18:21, SHA-256 in TODO F.4 unchanged across the gate; one network-blip rerun).
+   Next F.5: CHANGELOG date, push `main`, tag, publish the GitHub Release directly, 10 mod jars, no sources (check
+   10 assets, SHA-256); then remove Prism's `commitment-smoke` instance (marker `.commitment-smoke`, Prism closed).
+   **Don't rebuild before F.5**: the gate proved these exact jars. Stop after F.5 for the owner.
 
 ## How to run things
 - Build: `./gradlew build` (all 13 nodes with 1.21.11; Fabric's `check` includes `runGameTest`). Read counts from

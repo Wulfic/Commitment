@@ -1474,9 +1474,47 @@ instance. Stop after each of F.3, F.4, F.5.
       test here captures logs); any behaviour change.
       **Blast radius:** two classes' internals, one new class, two test files; dev worlds of the smoke (removed by
       commit-smoke). **Rollback:** `git revert` of the F.3 commit.
-- [ ] F.4 **Release gate again**, on F.3's 1.0.0 jars: F.2's matrix (rung 6 on 17 real servers, rung 5 on 17
+- [x] F.4 **Release gate again**, on F.3's 1.0.0 jars: F.2's matrix (rung 6 on 17 real servers, rung 5 on 17
       clients) plus F.0 3(b) at the six NeoForge/Forge floors (the README claims them). Same commands as F.2/F.0,
       results recorded here. Any exit 1 or 2 blocks F.5.
+      **Done, session 15: all 40 green** (19:04-20:22, one rerun below). The ten jars' SHA-256 the same before the gate
+      and after it (`sha256sum -c`): the jars proven are the jars F.5 ships.
+      - **Rung 6, 17 real servers: exit 0 on all 17**, 3 × `dev-server-smoke: PASS` each (committed `world committed
+        (N mods, ...)`; refused with `Config added: config/commitment-smoke-locked.json`; `world is committed and its
+        setup matches`); lock files removed by commit-smoke. Boot lines from each server's `latest.log`, written this
+        run: `Commitment 1.0.0 loaded on Fabric 0.19.5, Minecraft` 1.21.11 / 26.1 / 26.1.1 / 26.1.2 / 26.2 / 26.3; `on
+        Quilt 0.31.0-beta.4, Minecraft` 26.1 / 26.1.1 / 26.1.2 / 26.2 / 26.3; `on NeoForge` 26.1.2.122 / 26.2.0.93 /
+        26.3.0.95; `on Forge` 64.1.5 / 65.1.5 / 66.1.0.
+      - **F.0 3(b), 6 floors: exit 0 on all 6**, 3 PASS each, boot lines `on NeoForge 26.1.2.114` / `26.2.0.90` /
+        `26.3.0.51-beta`, `on Forge 64.0.0` / `65.0.0` / `66.0.0`. NeoForge 26.2.0.90's first run: **exit 1, the
+        network**: four `@expect` misses of the unlock step, the reply `can't start the unlock without internet time
+        (0 of 3 time servers answered (www.google.com: SocketTimeoutException ...; www.cloudflare.com:
+        UnknownHostException ...))` at 19:41; all its other checks matched, and the mod refusing there is right. All
+        three hosts answered (HEAD 200) at 19:45 and before the rerun; **rerun 20:21 exit 0**, 3 PASS, `unlock
+        available at ... (24h)` and `unlock cancelled; the world stays committed` matched (gotchas 2026-10-28).
+      - **Rung 5, 17 clients: exit 0 on all 17.** `./gradlew :fabric:<n>:runClientGameTest` 1.21.11 / 26.1.2 / 26.2 /
+        26.3: `BUILD SUCCESSFUL`, `client world check: PASS`, `client gate check: PASS`, boot line `on Fabric 0.19.5,
+        Minecraft <n>`. `client-locked-smoke.sh` NeoForge and Forge × 26.1.2 / 26.2 / 26.3: `client-locked-smoke:
+        PASS`, 5 matched each, boot lines naming the pins. `prism-smoke.sh` Quilt 26.1 / 26.1.1 / 26.1.2 / 26.2 /
+        26.3, Fabric 26.1 / 26.1.1: `prism-smoke: PASS`, 7 matched each, boot line naming the loader and Minecraft.
+      - After every run the owner's `%LOCALAPPDATA%\Commitment` was absent; afterwards no game JVM or Prism running.
+        No hs_err in any run (free commit memory was ~4.9 GB at the start: no exhaustion this time).
+      **Owner, session 15:** run unattended now (game windows, Prism with the owner's account; Prism kept closed). A run
+      that dies of Windows commit exhaustion (hs_err says so, not the mod) is recorded and rerun, 3 attempts per run.
+      **Jars:** the ten `commitment-1.0.0+*` built 18:21:22-18:21:53, after F.3's last source edit (18:20:12); no
+      rebuild before the gate (a rebuild would make them other jars than the ones proven).
+      **Order** (serially, one JVM at a time; `scratchpad/f4-matrix.sh` logs each run's output, exit code, and that the
+      owner's `%LOCALAPPDATA%\Commitment` is absent after it):
+      1. Rung 6, 17 servers: `LOADER=<l> NODE=<n> REAL=<v> bash scripts/commit-smoke.sh scripts/checks/commit-flow.txt
+         scripts/checks/locked-config.txt scripts/checks/config-restored.txt`, F.2's matrix.
+      2. F.0 3(b), 6 floors, same command: NeoForge 26.1.2.114, 26.2.0.90, 26.3.0.51-beta; Forge 64.0.0, 65.0.0, 66.0.0.
+      3. Rung 5, 17 clients: `./gradlew :fabric:<n>:runClientGameTest` ×4 (both PASS lines read); `client-locked-smoke.sh`
+         ×6; `prism-smoke.sh` ×7 (after 1, which leaves the worlds it copies).
+      Each run's boot line is read for `Commitment 1.0.0 loaded on <loader> <version>`.
+      **Not doing:** F.0 3(a)/3(c) again (floor compile and floor clients: F.3 changed server tick code only); a
+      rebuild; touching the other repo's Gradle daemon (PID 22608).
+      **Blast radius:** dev/real world copies under `run/` (removed by the scripts' markers), the `commitment-smoke`
+      Prism instance (rewritten per run, as F.2). **Rollback:** none needed: nothing tracked changes but this file.
 - [ ] F.5 **Release 1.0.0.** CHANGELOG date; push `main`; tag; `gh release create` with the 10 mod jars and the
       CHANGELOG entry as notes, published; check the release lists 10 assets with matching SHA-256. Then remove
       `instances/commitment-smoke` from Prism (marker checked, Prism closed).

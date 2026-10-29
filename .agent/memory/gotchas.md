@@ -455,3 +455,13 @@ another repo's test run, hs_err "insufficient memory", after `setup matches` had
 **Fix:** `: > "$OUT"` before the pipeline; a self-test case pins its place (a race can't be pinned by a run).
 **Rule:** never let a reader of a file start in the same pipeline as the redirect that resets it.
 **Affects:** scripts/dev-server-smoke.sh
+
+## 2026-10-28 — A network blip fails commit-flow.txt as exit 1, though nothing about the mod was proven
+**Symptom:** F.4, `REAL=26.2.0.90 commit-smoke.sh` on NeoForge 26.2: exit 1, four `FAIL: no line matching @expect ...
+unlock available at` / `unlock cancelled`. The reply instead: `can't start the unlock without internet time (0 of 3 time
+servers answered (www.google.com: SocketTimeoutException ...; www.cloudflare.com: UnknownHostException ...))`.
+**Cause:** the machine's network dropped for a moment at 19:41; four minutes later all three hosts answered (HEAD 200).
+The mod did what it should (refuse the unlock without internet time); every other check of that boot matched.
+**Rule:** an `internet time` refusal in a smoke log is the environment, not the mod: probe the three hosts, then rerun.
+The harness can't tell the two apart yet, so it says 1 where 2 ("nothing proven") is the truth.
+**Affects:** scripts/checks/commit-flow.txt, scripts/dev-server-smoke.sh (verdict)
