@@ -13,12 +13,12 @@ def javaRelease = project.property("java_version.$band") as int
 // Keeps `:fabric:26.2` a different module from `:common:26.2` (see common/build.gradle).
 group = "${project.group}.fabric"
 
-// commitment-<version>+fabric-mc<band label>.jar, and the matching sources jar. The mod's own version in
-// fabric.mod.json stays plain.
+// commitment-<version>+<jar loader>-mc<band label>.jar (fabric-quilt-mc26.1-26.1.2), and the matching sources jar.
+// The mod's own version in fabric.mod.json stays plain.
 base {
 	archivesName = rootProject.name
 }
-def jarVersion = "${project.version}+fabric-mc${project.property("band_label.$band")}"
+def jarVersion = "${project.version}+${project.property("jar_loader.$band")}-mc${project.property("band_label.$band")}"
 tasks.withType(AbstractArchiveTask).configureEach {
 	archiveVersion = jarVersion
 }

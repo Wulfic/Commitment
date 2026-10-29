@@ -115,9 +115,9 @@ self_test() {
 	prepare_instance "$dir/instances" > /dev/null || { echo "FAIL a marked instance is accepted again"; failures=$((failures + 1)); }
 
 	local mods=$dir/instances/$INSTANCE/minecraft/mods
-	touch "$mods/commitment-1.0.0+fabric-mc26.1.jar" "$mods/fabric-api-0.145.1+26.1.jar" "$mods/other-mod.jar"
+	touch "$mods/commitment-1.0.1+fabric-quilt-mc26.1-26.1.2.jar" "$mods/fabric-api-0.145.1+26.1.jar" "$mods/other-mod.jar"
 	clear_mods "$dir/instances/$INSTANCE" > /dev/null
-	expect absent "clear_mods removes the Commitment jar" "$mods/commitment-1.0.0+fabric-mc26.1.jar"
+	expect absent "clear_mods removes the Commitment jar" "$mods/commitment-1.0.1+fabric-quilt-mc26.1-26.1.2.jar"
 	expect absent "clear_mods removes Fabric API" "$mods/fabric-api-0.145.1+26.1.jar"
 	expect present "clear_mods leaves any other jar" "$mods/other-mod.jar"
 	mkdir -p "$dir/other/$INSTANCE/minecraft/mods" && touch "$dir/other/$INSTANCE/minecraft/mods/commitment-x.jar"
@@ -168,7 +168,9 @@ case "$PRISM_LOADER" in
 	quilt) LOADER_UID=org.quiltmc.quilt-loader; LOADER_VERSION=$(gradle_prop quilt_loader_version); LOADER_NAME=Quilt ;;
 	*) echo "PRISM_LOADER must be fabric or quilt, not '$PRISM_LOADER'" >&2; exit 2 ;;
 esac
+# The band's lowest Minecraft: the label is that version, or LOW-HIGH when the band spans several.
 label=$(gradle_prop "band_label.$NODE" 2> /dev/null || true)
+label=${label%%-*}
 if [[ ! $MC =~ ^[0-9]+(\.[0-9]+)+$ || -z $label || ($MC != "$label" && $MC != "$label".*) ]]; then
 	echo "prism-smoke: MC=$MC isn't a Minecraft of node '$NODE's band (${label:-none})" >&2
 	exit 2
@@ -201,7 +203,7 @@ if [[ $(wc -w <<< "$API") -ne 1 ]]; then
 	echo "prism-smoke: NOTHING PROVEN (exit 2): need exactly one checked Fabric API in $REAL_DIR/mods (found: ${API:-none})" >&2
 	exit 2
 fi
-BUILT=$(compgen -G "fabric/versions/$NODE/build/libs/commitment-*+fabric-mc*.jar" | grep -v -- '-sources\.jar$' || true)
+BUILT=$(compgen -G "fabric/versions/$NODE/build/libs/commitment-*+fabric*-mc*.jar" | grep -v -- '-sources\.jar$' || true)
 if [[ $(wc -w <<< "$BUILT") -ne 1 ]]; then
 	echo "prism-smoke: NOTHING PROVEN (exit 2): need exactly one built Fabric jar in fabric/versions/$NODE/build/libs (found: ${BUILT:-none})" >&2
 	exit 2

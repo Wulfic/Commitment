@@ -127,17 +127,19 @@ its marker and that world's lock id), and logs each path it deleted.
 
 The current band is **26.x**: Minecraft 26.1 to 26.3, on Fabric, Quilt, NeoForge and Forge. Minecraft
 **1.21.11 on Fabric** is supported too, and gets the same fixes. Fixes and features go to these only. Older bands
-are frozen: their releases stay up, but they get no fixes.
+are frozen: they get no fixes. Only the newest release stays on the Releases page.
 
-Each release has one jar per Minecraft band and loader, named `commitment-<version>+<loader>-mc<band>.jar`. Pick
-the loader you run and the band that holds your Minecraft version:
+Each release has one jar per Minecraft band and loader, named `commitment-<version>+<loaders>-mc<minecraft>.jar`:
+`<loaders>` is `fabric-quilt` (one jar for both), `fabric` (1.21.11, Fabric only), `neoforge` or `forge`, and
+`<minecraft>` is the Minecraft version it runs on, or the lowest and highest when it runs on several (`mc26.1-26.1.2`).
+Pick the loader you run and the band that holds your Minecraft version:
 
 | Minecraft | Fabric and Quilt | NeoForge | Forge |
 |---|---|---|---|
-| **1.21.11** | `mc1.21.11`: Fabric only | — | — |
-| **26.1 – 26.1.2** | `mc26.1`: 26.1 – 26.1.2 | `mc26.1.2`: 26.1.2 only, NeoForge 26.1.2.114 or newer | `mc26.1.2`: 26.1.2 only, Forge 64.0.0 or newer |
-| **26.2** | `mc26.2` | `mc26.2`: NeoForge 26.2.0.90 or newer | `mc26.2`: Forge 65.0.0 or newer |
-| **26.3** | `mc26.3` | `mc26.3`: NeoForge 26.3.0.51-beta or newer | `mc26.3`: Forge 66.0.0 or newer |
+| **1.21.11** | `fabric-mc1.21.11`: Fabric only | — | — |
+| **26.1 – 26.1.2** | `fabric-quilt-mc26.1-26.1.2` | `neoforge-mc26.1.2`: 26.1.2 only, NeoForge 26.1.2.114 or newer | `forge-mc26.1.2`: 26.1.2 only, Forge 64.0.0 or newer |
+| **26.2** | `fabric-quilt-mc26.2` | `neoforge-mc26.2`: NeoForge 26.2.0.90 or newer | `forge-mc26.2`: Forge 65.0.0 or newer |
+| **26.3** | `fabric-quilt-mc26.3` | `neoforge-mc26.3`: NeoForge 26.3.0.51-beta or newer | `forge-mc26.3`: Forge 66.0.0 or newer |
 
 The Fabric jar needs Fabric Loader 0.19.5 or newer and Fabric API. Quilt runs the Fabric jar, so there is no
 separate Quilt jar; Quilt Loader has only betas for 26.x (0.31.0-beta.4). NeoForge and Forge have no stable build for

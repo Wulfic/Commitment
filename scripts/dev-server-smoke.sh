@@ -19,8 +19,8 @@
 # the node's built Fabric jar (build it first) and Fabric API in mods/, and LOCALAPPDATA set to run/quilt/<node>/appdata
 # so the lock mirror of a released jar stays in run/ too. REAL=<loader version> (LOADER=neoforge or forge) does the same
 # on a real server of that NeoForge or Forge build, in run/real/<loader>/<node>/<version>/server, and requires the boot
-# line to name that build. With LOADER=fabric or quilt, REAL=<minecraft version> (the node's band label, or a patch of
-# it: what the jar's minecraft_range covers) runs a real Fabric or Quilt server of that Minecraft in
+# line to name that build. With LOADER=fabric or quilt, REAL=<minecraft version> (the band label's lowest version, or a
+# patch of it: what the jar's minecraft_range covers) runs a real Fabric or Quilt server of that Minecraft in
 # run/real/<loader>/<node>/<minecraft>/server, with Fabric API for it, and requires the boot line to name that Minecraft.
 # @sh, @before and @after steps see RUN_ROOT (run/<loader>/<node>, or the REAL one).
 #
@@ -412,9 +412,11 @@ if [[ -n $REAL ]]; then
 		echo "REAL must be a version like 26.3.0.51-beta, 66.0.0 or 26.1, not '$REAL'" >&2
 		exit 2
 	fi
-	# On Fabric and Quilt it's a Minecraft the jar declares: the band label or a patch of it (minecraft_range).
+	# On Fabric and Quilt it's a Minecraft the jar declares: the band's lowest version or a patch of it
+	# (minecraft_range). The label is that version, or LOW-HIGH when the band spans several.
 	if [[ $LOADER == fabric || $LOADER == quilt ]]; then
 		label=$(grep -E "^band_label\.$(sed 's/\./\\./g' <<< "$NODE")=" gradle.properties | cut -d= -f2 | tr -d '[:space:]')
+		label=${label%%-*}
 		if [[ -z $label || ($REAL != "$label" && $REAL != "$label".*) ]]; then
 			echo "REAL=$REAL isn't a Minecraft of node $NODE's band (${label:-none}); the jar doesn't declare it" >&2
 			exit 2
@@ -494,7 +496,7 @@ if [[ $SERVER == vanilla ]]; then
 	JAR_ARGS=(${JVM_PROPS[@]+"${JVM_PROPS[@]}"} -jar server.jar --port "$PORT" --universe "$PWD/$RUN_DIR" --world "${LEVEL_NAME:-world}" nogui)
 elif [[ $LOADER == quilt ]]; then
 	JAR_DIR=$RUN_DIR
-	BUILT=$(compgen -G "fabric/versions/$NODE/build/libs/commitment-*+fabric-mc*.jar" | grep -v -- '-sources\.jar$' || true)
+	BUILT=$(compgen -G "fabric/versions/$NODE/build/libs/commitment-*+fabric*-mc*.jar" | grep -v -- '-sources\.jar$' || true)
 	if [[ $(wc -w <<< "$BUILT") -ne 1 ]]; then
 		echo "dev-server-smoke: need exactly one built Fabric jar in fabric/versions/$NODE/build/libs (found: ${BUILT:-none}); run ./gradlew :fabric:$NODE:build" >&2
 		exit 2
@@ -513,7 +515,7 @@ elif [[ $LOADER == quilt ]]; then
 	JAR_ARGS=(-Xmx3G ${JVM_PROPS[@]+"${JVM_PROPS[@]}"} -jar quilt-server-launch.jar --port "$PORT" nogui)
 elif [[ $LOADER == fabric && -n $REAL ]]; then
 	JAR_DIR=$RUN_DIR
-	BUILT=$(compgen -G "fabric/versions/$NODE/build/libs/commitment-*+fabric-mc*.jar" | grep -v -- '-sources\.jar$' || true)
+	BUILT=$(compgen -G "fabric/versions/$NODE/build/libs/commitment-*+fabric*-mc*.jar" | grep -v -- '-sources\.jar$' || true)
 	if [[ $(wc -w <<< "$BUILT") -ne 1 ]]; then
 		echo "dev-server-smoke: need exactly one built Fabric jar in fabric/versions/$NODE/build/libs (found: ${BUILT:-none}); run ./gradlew :fabric:$NODE:build" >&2
 		exit 2

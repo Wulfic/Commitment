@@ -30,6 +30,8 @@ class ReadmeBandsTest {
 	private static final String FROZEN = "Frozen on branch";
 	/** The cell of a loader that has no jar for the band (no `<loader>_band_label.<band>` key): 1.21.11 is Fabric only. */
 	private static final String NO_JAR = "—";
+	/** What the Fabric cell says when its jar isn't for Quilt (jar_loader `fabric`, not `fabric-quilt`). */
+	private static final String FABRIC_ONLY = "Fabric only";
 
 	private static Properties gradle;
 	/** The table's rows, keyed by the Minecraft cell without its bold markers. */
@@ -107,9 +109,12 @@ class ReadmeBandsTest {
 			List<String> cells = rows.get(versions(band));
 			assertNotNull(cells, "README has no row for band " + band);
 			assertEquals(4, cells.size(), "README row " + cells + " should have 4 cells: Minecraft, Fabric and Quilt, NeoForge, Forge");
-			assertJar(cells.get(1), "Fabric", property("band_label." + band));
-			assertJar(cells.get(2), "NeoForge", gradle.getProperty("neoforge_band_label." + band));
-			assertJar(cells.get(3), "Forge", gradle.getProperty("forge_band_label." + band));
+			String fabricLoader = property("jar_loader." + band);
+			assertJar(cells.get(1), "Fabric", fabricLoader, property("band_label." + band));
+			assertEquals(fabricLoader.equals("fabric"), cells.get(1).contains(FABRIC_ONLY), "README's Fabric cell '"
+					+ cells.get(1) + "' should say '" + FABRIC_ONLY + "' exactly when its jar is " + fabricLoader + "-mc");
+			assertJar(cells.get(2), "NeoForge", "neoforge", gradle.getProperty("neoforge_band_label." + band));
+			assertJar(cells.get(3), "Forge", "forge", gradle.getProperty("forge_band_label." + band));
 			assertFloor(cells.get(2), "NeoForge", gradle.getProperty("neoforge_floor." + band));
 			assertFloor(cells.get(3), "Forge", gradle.getProperty("forge_floor." + band));
 			for (String cell : cells) {
@@ -118,14 +123,18 @@ class ReadmeBandsTest {
 		}
 	}
 
-	/** @param label the band label of the loader's jar, or null when the build makes no jar of that loader for the band */
-	private static void assertJar(String cell, String loader, String label) {
+	/**
+	 * @param jarLoader the loaders in the jar's name (fabric-quilt, neoforge)
+	 * @param label the band label of the loader's jar, or null when the build makes no jar of that loader for the band
+	 */
+	private static void assertJar(String cell, String loader, String jarLoader, String label) {
 		if (label == null) {
 			assertEquals(NO_JAR, cell, "README's " + loader + " cell '" + cell + "' names a jar the build doesn't make");
 			return;
 		}
-		assertTrue(cell.equals("`mc" + label + "`") || cell.startsWith("`mc" + label + "`:"),
-				"README's " + loader + " cell '" + cell + "' should name the jar's band `mc" + label + "`");
+		String name = "`" + jarLoader + "-mc" + label + "`";
+		assertTrue(cell.equals(name) || cell.startsWith(name + ":"),
+				"README's " + loader + " cell '" + cell + "' should name the jar " + name);
 	}
 
 	/**
