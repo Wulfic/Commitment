@@ -1658,8 +1658,21 @@ setup-java v6, gradle/actions v6, upload-artifact v7, download-artifact v8. Repo
       Rung 3 on the changed lookup: `LOADER=fabric NODE=26.1.2 REAL=26.1 dev-server-smoke.sh scripts/checks/boot.txt`
       **exit 0**, PASS: removed the older `commitment-1.0.0+fabric-mc26.1.jar`, matched `Commitment 1.0.0 loaded on
       Fabric 0.19.5, Minecraft 26.1` and the `list` reply; the owner's `%LOCALAPPDATA%\Commitment` absent.
-- [ ] 6. Push 1 (version still 1.0.0, so no release: v1.0.0 exists): the workflow's first CI run must be green and
+- [x] 6. Push 1 (version still 1.0.0, so no release: v1.0.0 exists): the workflow's first CI run must be green and
       prune a no-op. Budget 3 on CI-only failures.
+      **Done, three different first-run failures, each fixed at its cause (gotchas 2026-10-29):** run 40833248487:
+      `./gradlew: Permission denied` (exit 126) → `gradlew` 100755 (`7c741e9`). Run 40833395528:
+      `MirrorDirAndSettingsTest.windows*` red on Linux on all four common nodes (a Windows path isn't absolute to a
+      Linux `Path`) → `@EnabledOnOs(WINDOWS)` + `--continue` (`03b1bb4`; still 10/10, 0 skipped per node on Windows).
+      Run 40835186492: `:fabric:26.2` GameTest `commit_and_unlock_from_the_console` failed the tick `/unlock cancel`
+      ran; its reply came from the command thread just after. 26.2's GameTestInfo fails a sequence only past
+      `timeoutTicks` (javap), and Fabric passes `maxTicks` through: the unthrottled test server spent 2400 ticks in ~2 s,
+      less than the cancel's file write on the runner. **Rerun of the failed job: green** (a timing flake, not the
+      mod). Budget raised to 24000 ticks with the reason (`:fabric:26.2:runGameTest` locally 6/6).
+      **Green run 40835186492 attempt 2:** common 306 ×4, fabric 22 ×4, 0 failed (the workflow's count step), 10 jars
+      staged with the new names; release job: `v1.0.0 is released already; nothing to publish`, `release-prune:
+      nothing older than v1.0.0; nothing to delete`. **The CI-built 1.0.0 jars' SHA-256 equal F.5's released ones**
+      (all ten): the build reproduces byte for byte across Windows and Linux, and the rename changed no jar content.
 - [x] 7. Back up v1.0.0 before anything can delete it: its 10 assets + notes + tag facts into
       `run/release-backup/v1.0.0/` (git-ignored), `sha256sum -c` against F.5's list. The local tag `v1.0.0` stays.
       **Done:** 10 jars `sha256sum -c` against F.5's hashes: 10 OK; `notes.md` byte-identical to the published body;

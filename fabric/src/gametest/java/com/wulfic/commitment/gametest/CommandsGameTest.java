@@ -41,7 +41,10 @@ public class CommandsGameTest {
 	private static final long SECOND = 1_000_000_000L;
 	private static final GameRule<Integer> RULE = GameRules.RANDOM_TICK_SPEED;
 
-	@GameTest(maxTicks = 2400)
+	// The GameTest server ticks unthrottled (the six tests take ~3 s), while /commit confirm and /unlock cancel answer
+	// from a "Commitment command" thread after a file write. 2400 ticks ran out before /unlock cancel's write on a CI
+	// runner (2026-10-29); this is the wall-clock room for slow disks, not a tick count the test needs.
+	@GameTest(maxTicks = 24000)
 	public void commitAndUnlockFromTheConsole(GameTestHelper helper) {
 		MinecraftServer server = helper.getLevel().getServer();
 		Path world = CommitmentServer.worldDir(server);
