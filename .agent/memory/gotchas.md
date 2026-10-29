@@ -497,3 +497,12 @@ at once and each tripped over children the other had removed. The dir was gone a
 **Rule:** `./gradlew clean` and `./gradlew build` as two invocations. Don't read that error as a live server
 until the process list shows one.
 **Affects:** forge/build.gradle (clearGameTestRunDir), local builds; CI never cleans (fresh checkout)
+
+## 2026-10-29 — The first Linux run: gradlew mode and host-dependent Windows path tests
+**Symptom:** CI run 1: `./gradlew: Permission denied` (exit 126): the wrapper was committed 100644 from Windows.
+Run 2: `MirrorDirAndSettingsTest.windows*` red on all four common nodes (`expected C:\Users\p\AppData\Local/... but
+was null`): `MirrorDir.resolve` asks the host's `Path.isAbsolute()`, and on Linux `C:\Users\p` isn't absolute.
+**Rule:** `git update-index --chmod=+x gradlew`. A test that fakes another OS through `java.nio.file.Path` only means
+something on that OS: `@EnabledOnOs` with the reason, and count that it still runs locally (0 skipped on Windows).
+The mod's code is right as is (it only ever resolves the host's own OS). CI builds with `--continue`.
+**Affects:** gradlew, common/.../MirrorDirAndSettingsTest, .github/workflows/release.yml

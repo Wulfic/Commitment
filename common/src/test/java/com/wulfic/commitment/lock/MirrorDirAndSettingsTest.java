@@ -8,6 +8,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.EnabledOnOs;
+import org.junit.jupiter.api.condition.OS;
 
 class MirrorDirAndSettingsTest {
 	@Test
@@ -42,13 +44,17 @@ class MirrorDirAndSettingsTest {
 		}
 	}
 
+	// The Windows cases need a Windows host: resolve() asks the host's Path whether a dir is absolute, which is right in
+	// a game (os.name is the host), but on Linux "C:\Users\p" isn't absolute and resolve() gives null (CI, 2026-10-29).
 	@Test
+	@EnabledOnOs(OS.WINDOWS)
 	void windowsUsesLocalAppData() {
 		assertEquals(Path.of("C:\\Users\\p\\AppData\\Local", "Commitment", "locks"),
 				MirrorDir.resolve("Windows 11", Map.of("LOCALAPPDATA", "C:\\Users\\p\\AppData\\Local"), "C:\\Users\\p"));
 	}
 
 	@Test
+	@EnabledOnOs(OS.WINDOWS)
 	void windowsWithoutLocalAppDataFallsBackToTheHomeDir() {
 		assertEquals(Path.of("C:\\Users\\p", "AppData", "Local", "Commitment", "locks"),
 				MirrorDir.resolve("Windows 11", Map.of(), "C:\\Users\\p"));

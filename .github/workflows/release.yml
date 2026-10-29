@@ -51,7 +51,8 @@ jobs:
           bash scripts/release-prune.sh --self-test
 
       - name: Build and test every band
-        run: ./gradlew build -Pgametest_max_parallel=1 --stacktrace
+        # --continue: one run reports every failing node, not the first.
+        run: ./gradlew build -Pgametest_max_parallel=1 --continue
 
       # A green build has meant "ran zero tests" here before: read the counts. Every common and fabric node runs JUnit;
       # the GameTests fail the build themselves.
