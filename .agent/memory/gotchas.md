@@ -480,3 +480,20 @@ fallback, not a proof. F.5's entry now holds 1.0.0's ten hashes.
 **Rule:** `--notes-file` gets the entry's body with continuation lines (two-space indent) joined to their bullet;
 check the alphanumeric content is identical (`tr -cd '[:alnum:]' | md5sum` on both). CHANGELOG.md itself stays wrapped.
 **Affects:** releases (git-github skill)
+
+## 2026-10-29 — Bash traps in a self-test function: RETURN fires per helper, EXIT loses locals
+**Symptom:** release-prune.sh's self-test: `trap 'rm -rf -- "$tmp"' RETURN` is global, so it would fire when the
+first nested helper returns; as `EXIT` with `local tmp`, the trap ran after the function and hit `tmp: unbound
+variable` under `set -u` (exit 1, temp dir left behind).
+**Rule:** `trap "rm -rf -- '$tmp'" EXIT`: expand the path when the trap is set. Also: a band label can be a range
+now (`26.1-26.1.2`); scripts that compare a Minecraft against it take the low end, `${label%%-*}`.
+**Affects:** scripts/release-prune.sh, scripts/dev-server-smoke.sh, scripts/prism-smoke.sh
+
+## 2026-10-29 — `./gradlew clean build` races on Forge's GameTest run dir
+**Symptom:** `clean build -Pgametest_max_parallel=1` failed in 44 s: `:forge:<n>:clean` "Unable to delete ...
+build" and `:forge:<n>:clearGameTestRunDir` "Could not clear build/run/gameTest; a server from the last run may still
+hold it", on 26.1.2 and 26.2. No JVM held anything: with `org.gradle.parallel`, the two tasks deleted the same tree
+at once and each tripped over children the other had removed. The dir was gone afterwards.
+**Rule:** `./gradlew clean` and `./gradlew build` as two invocations. Don't read that error as a live server
+until the process list shows one.
+**Affects:** forge/build.gradle (clearGameTestRunDir), local builds; CI never cleans (fresh checkout)

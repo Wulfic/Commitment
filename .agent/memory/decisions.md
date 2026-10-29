@@ -527,3 +527,23 @@ the 4 `common` jars aren't mods.
 **Why:** The owner wants every error path tested before 1.0.0 ships, and pays for the rerun.
 **Rejected:** Shipping the proven jars and testing C.6 in 1.0.1. A draft release to check first. Sources jars.
 **Affects:** TODO F.3-F.5, SettingsLock, CommitmentServer, WorldSettings, new lock/HeldSettings
+
+## 2026-10-29 — 1.0.1: jar names name their loaders and Minecraft range; CI releases on a version bump and prunes
+**Context:** Owner, session 18: `fabric-mc26.1` hid that Quilt runs it and that it runs on 26.1-26.1.2. There was no
+CI (1.0.0 was `gh release create` by hand); the owner wants push → release, version 1.0.1, and "CI cleaning up old
+versions so things don't get messy".
+**Choice:** `jar_loader.<band>` (`fabric-quilt`, or `fabric` on 1.21.11) and `band_label` = `LOW` or `LOW-HIGH` from
+Mojang's release list (`26.1-26.1.2`); BandLabelTest holds HIGH to the compiled version. `.github/workflows/release.yml`:
+every push to main builds and tests; if `v<version>` has no release it publishes the jars (notes from CHANGELOG via
+`scripts/release-notes.py`) and checks them by SHA-256; then `scripts/release-prune.sh` deletes every older vX.Y.Z
+**release and tag** (the owner's pick of three: delete releases + tags / releases only / keep). 1.21.11 stays
+`fabric-mc1.21.11`: Quilt was never proven there. Owner waived the release gate for 1.0.1 ("no code changes").
+**Why:** Names a player can pick a jar by; one release on the Releases page. Pruning is guarded: dry-run default,
+refuses unless the kept release is published with every jar, refuses a tag whose commit isn't on main (re-tagging is
+the way back), plans everything before deleting; a stubbed self-test proves each refusal deletes nothing.
+**Rejected:** `fabric-quilt` on 1.21.11 untested; keeping old releases; a hash-locked CI publish tied to the gate (no
+gate this release); CI publishing jars built elsewhere.
+**Conflict left for the owner:** AGENTS.md's bands section says frozen bands' "releases stay up"; pruning deletes them.
+README now says only the newest release stays.
+**Affects:** gradle.properties, fabric/build.gradle, BandLabelTest, ReadmeBandsTest, README, dev-server-smoke.sh,
+prism-smoke.sh, scripts/release-*.{py,sh}, .github/workflows/release.yml

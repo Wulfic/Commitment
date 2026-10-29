@@ -1,0 +1,178 @@
+# Every push to main builds and tests every band. When gradle.properties' version has no release yet, the release
+# job publishes one: the jars, one per band and loader, with the CHANGELOG entry as notes. Then it deletes every
+# older vX.Y.Z release and tag (scripts/release-prune.sh; owner, .agent/memory/decisions.md 2026-10-29).
+# Action majors from each action's releases/latest, 2026-10-29.
+name: Release
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# One run at a time, none cancelled: a release half made by a cancelled run is worse than a queued run.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      jars: ${{ steps.stage.outputs.jars }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: 25
+
+      - uses: gradle/actions/setup-gradle@v6
+
+      - name: Version
+        id: version
+        run: |
+          version=$(sed -n 's/^version=//p' gradle.properties | tr -d '[:space:]')
+          if [[ ! $version =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::gradle.properties' version '$version' isn't X.Y.Z"
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Release scripts' self-tests
+        run: |
+          python3 -I scripts/release-notes.py --self-test
+          python3 -I scripts/release-notes.py "${{ steps.version.outputs.version }}" > /dev/null
+          bash scripts/release-prune.sh --self-test
+
+      - name: Build and test every band
+        run: ./gradlew build -Pgametest_max_parallel=1 --stacktrace
+
+      # A green build has meant "ran zero tests" here before: read the counts. Every common and fabric node runs JUnit;
+      # the GameTests fail the build themselves.
+      - name: Count the tests that ran
+        run: |
+          python3 -I - << 'EOF'
+          import glob, os, sys
+          import xml.etree.ElementTree as ET
+          nodes = {}
+          for loader in ("common", "fabric"):
+              for node in sorted(glob.glob(f"{loader}/versions/*")):
+                  nodes[node] = [0, 0]
+          for f in glob.glob("*/versions/*/build/test-results/test/TEST-*.xml"):
+              node = "/".join(f.split("/")[:3])
+              suite = ET.parse(f).getroot()
+              ran = nodes.setdefault(node, [0, 0])
+              ran[0] += int(suite.get("tests"))
+              ran[1] += int(suite.get("failures")) + int(suite.get("errors"))
+          lines = ["| Node | Tests | Failed |", "|---|---|---|"] + [f"| {n} | {t} | {b} |" for n, (t, b) in sorted(nodes.items())]
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as summary:
+              summary.write("\n".join(lines) + "\n")
+          print("\n".join(lines))
+          bad = [n for n, (t, b) in nodes.items() if t == 0 or b]
+          if not nodes or bad:
+              print(f"::error::no tests ran, or some failed, on: {', '.join(bad) or 'every node'}")
+              sys.exit(1)
+          EOF
+
+      # Flat: upload-artifact keeps the directory structure of several paths, so the jars go into one folder first.
+      - name: Stage the release jars
+        id: stage
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          expected=$(grep -cE '^(neoforge_|forge_)?band_label\.' gradle.properties)
+          mkdir release
+          for jar in {fabric,neoforge,forge}/versions/*/build/libs/commitment-"$VERSION"+*.jar; do
+            [[ $jar == *-sources.jar ]] || cp -- "$jar" release/
+          done
+          found=$(find release -name '*.jar' | wc -l)
+          if [[ $found != "$expected" ]]; then
+            echo "::error::$found release jars for $VERSION, but gradle.properties has $expected bands: $(ls release)"
+            exit 1
+          fi
+          (cd release && sha256sum -- *.jar > SHA256SUMS)
+          { echo '```'; cat release/SHA256SUMS; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          cat release/SHA256SUMS
+          echo "jars=$found" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: jars
+          path: release/
+          if-no-files-found: error
+
+  release:
+    needs: build
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      VERSION: ${{ needs.build.outputs.version }}
+      JARS: ${{ needs.build.outputs.jars }}
+    steps:
+      # Every branch and tag: release-prune.sh checks each old tag's commit is on origin/main before deleting it.
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: jars
+          path: release
+
+      # A tag with no release is refused, never published over: it may be on another commit.
+      - name: Is this version released?
+        id: state
+        run: |
+          tag="v$VERSION"
+          if gh release view "$tag" > /dev/null 2>&1; then
+            echo "$tag is released already; nothing to publish"
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+          elif git ls-remote --exit-code --tags origin "refs/tags/$tag" > /dev/null; then
+            echo "::error::tag $tag exists without a release; not publishing over it. Bump the version, or delete the tag"
+            exit 1
+          else
+            echo "publish=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Publish
+        if: steps.state.outputs.publish == 'true'
+        run: |
+          python3 -I scripts/release-notes.py "$VERSION" > notes.md
+          cat notes.md
+          gh release create "v$VERSION" release/*.jar --target "$GITHUB_SHA" --title "Commitment $VERSION" \
+            --notes-file notes.md --latest
+
+      # Check what was published, not the step's colour: every jar there, and each one the jar the build made.
+      - name: Check the published release
+        if: steps.state.outputs.publish == 'true'
+        run: |
+          gh release view "v$VERSION" --json isDraft,isPrerelease,assets \
+            --jq '"draft \(.isDraft), prerelease \(.isPrerelease), \(.assets | length) assets"'
+          # isLatest is a field of `gh release list`, not of `gh release view`.
+          latest=$(gh release list --json tagName,isLatest --jq '.[] | select(.isLatest) | .tagName')
+          if [[ $latest != "v$VERSION" ]]; then
+            echo "::error::the Latest release is '$latest', not v$VERSION"
+            exit 1
+          fi
+          mkdir published
+          gh release download "v$VERSION" --dir published --pattern '*.jar'
+          count=$(find published -name '*.jar' | wc -l)
+          if [[ $count != "$JARS" ]]; then
+            echo "::error::v$VERSION has $count jars, not $JARS"
+            exit 1
+          fi
+          (cd published && sha256sum -c ../release/SHA256SUMS)
+
+      - name: Delete older releases and tags
+        run: bash scripts/release-prune.sh --keep "v$VERSION" --assets "$JARS" --apply

@@ -1602,6 +1602,78 @@ Behaviour is already proven live: tamper chain boot 14 (mod and pack gone, the w
 
 **Rollback:** `git revert <commit>`.
 
+## 1.0.1: jar names that say what they run on, and a release workflow (Tier 2, planned 2026-10-29)
+
+**Owner, session 18:** the Fabric jar is `fabric-quilt` (Quilt runs it); a jar that runs on several Minecraft versions
+names the range (`mc26.1-26.1.2`); CI builds and publishes on push; version 1.0.1; CI cleans up old versions.
+Owner's answers (decisions.md 2026-10-29): CI deletes **older releases and their tags**; the 1.21.11 jar stays
+`fabric-mc1.21.11` (Quilt was never proven there, C.2a); **release gate waived for 1.0.1** ("no code changes so lets
+just push to git and let the ci do its job"): no rung 5/6 matrix. That waiver is a skip and is recorded as one.
+**Facts:** no `.github/workflows` existed (1.0.0 was `gh release create` by hand). Mojang's version manifest
+(piston-meta, 2026-10-29) releases: 1.21.11, 26.1, 26.1.1, 26.1.2, 26.2, 26.3. So only Fabric's 26.1 band spans
+several versions; NeoForge/Forge 26.1.2 run on 26.1.2 alone. Actions, `releases/latest` 2026-10-29: checkout v7,
+setup-java v6, gradle/actions v6, upload-artifact v7, download-artifact v8. Repo default workflow token: read.
+**Names:** `commitment-1.0.1+` `fabric-mc1.21.11`, `fabric-quilt-mc26.1-26.1.2`, `fabric-quilt-mc26.2`,
+`fabric-quilt-mc26.3`, `{neoforge,forge}-mc{26.1.2,26.2,26.3}`.
+
+- [x] 1. Names. `gradle.properties`: `band_label.26.1.2=26.1-26.1.2`, new `jar_loader.<band>` (`fabric` on 1.21.11,
+      `fabric-quilt` on 26.x); `fabric/build.gradle` uses it. `BandLabelTest`: a label is `LOW` or `LOW-HIGH`; the range
+      is `>=LOW <LOW+1`; the compiled version is `HIGH` (or `LOW`), so a label that hides a range is red.
+      `ReadmeBandsTest`: cells name `<jar loader>-mc<label>`; a `fabric` jar's cell says "Fabric only", a
+      `fabric-quilt` one doesn't. README table + naming sentence. Scripts: the Fabric jar glob (`+fabric*-mc*`) and the
+      REAL/MC band check reads the label's low end (`dev-server-smoke.sh`, `prism-smoke.sh`). Mutations: old label
+      `26.1` → BandLabelTest red; `jar_loader.1.21.11=fabric-quilt` → ReadmeBandsTest red.
+      **Done:** `:fabric:<n>:test` on all four nodes: BandLabelTest 2, ReadmeBandsTest 3 each, 0 failed. Mutations, each
+      restored (`cmp`): `band_label.26.1.2=26.1` → `compiledVersionIsTheHighestInTheName` red ("names 26.1 as its
+      highest Minecraft, but it was compiled against 26.1.2"); README's `: Fabric only` removed → `eachRowNamesItsBandsJars`
+      red. (The second planned mutation was swapped: `fabric-quilt` on 1.21.11 would trip the jar-name check first.)
+- [x] 2. `scripts/release-notes.py <version>`: the CHANGELOG entry's body, wrapped lines joined; `--self-test`.
+      **Done:** self-test 7/7; `release-notes.py 1.0.0` is byte-identical to v1.0.0's published body (stdout written
+      as bytes: Windows' text stdout had made it CRLF).
+- [x] 3. `scripts/release-prune.sh --keep vX.Y.Z --assets N [--apply]`: dry-run by default; refuses an empty or
+      malformed keep, a keep release that is a draft/prerelease or lacks N non-empty assets, and any old tag whose
+      commit isn't on `origin/main` (its source couldn't be re-tagged); plans everything before deleting anything;
+      deletes only `vX.Y.Z` tags older than keep (release + tag, or a lone tag); logs each deletion with its commit
+      (the recovery path). `--self-test` with a stubbed `gh` and a throwaway git repo: each refusal deletes nothing.
+      **Done:** self-test 15/15. Mutations, each red and restored (`cmp`): main-ancestry check off → the off-main case
+      deletes 3; draft/prerelease check off → 2 cases delete; `apply=1` default → the dry run deletes. Live dry runs:
+      `--keep v1.0.0 --assets 10` "nothing older" exit 0; `--assets 9` and `--keep v1.0.1` refused, exit 1.
+- [x] 4. `.github/workflows/release.yml`: on push to `main` (+ manual). Job `build` (read token): JDK 25,
+      `./gradlew build -Pgametest_max_parallel=1`, test counts read from the XML (0 tests or any failure → red), the
+      release jars staged flat, exactly one per `*band_label.*` key (10), SHA-256 file, artifact. Job `release`
+      (`contents: write`): if `v<version>` has no release: notes, `gh release create --target <sha> --latest`,
+      download back and `sha256sum -c`; a tag without a release → red (never clobber). Then the prune self-test and
+      `release-prune.sh --keep v<version> --assets 10 --apply`. actionlint + yaml parse.
+      **Done:** yaml parses; actionlint 1.7.12 (release zip, SHA-256 checked) 0 errors (no shellcheck installed, so its
+      shell checks didn't run; Docker Desktop wasn't running). Found while backing up: `gh release view` has no
+      `isLatest` (only `gh release list`); the check step uses `list`.
+- [x] 5. Local: `./gradlew clean build -Pgametest_max_parallel=1` (old-name jars gone), counts read; the scripts'
+      `--self-test`s; `release-prune.sh --keep v1.0.0 --assets 10` dry-run against the real repo (nothing older).
+      **Done:** `clean build` in one invocation raced on Forge's GameTest dir (gotchas 2026-10-29): `clean` alone, then
+      `build -Pgametest_max_parallel=1`: first exit 1, the `:common:26.1.2:test` JVM refused by Windows commit memory
+      (hs_err "insufficient memory", not a test); rerun **exit 0, BUILD SUCCESSFUL**: common 306 ×4, fabric 22 ×4, 0
+      failed (XML), `All 6 required tests passed` ×10. Jars: `commitment-1.0.0+fabric-mc1.21.11`,
+      `fabric-quilt-mc26.1-26.1.2`, `fabric-quilt-mc26.2`, `fabric-quilt-mc26.3`, `{neoforge,forge}-mc{26.1.2,26.2,26.3}`.
+      `dev-server-smoke.sh --self-test` exit 0 (all passed, 87 ok); `prism-smoke.sh --self-test` exit 0.
+      Rung 3 on the changed lookup: `LOADER=fabric NODE=26.1.2 REAL=26.1 dev-server-smoke.sh scripts/checks/boot.txt`
+      **exit 0**, PASS: removed the older `commitment-1.0.0+fabric-mc26.1.jar`, matched `Commitment 1.0.0 loaded on
+      Fabric 0.19.5, Minecraft 26.1` and the `list` reply; the owner's `%LOCALAPPDATA%\Commitment` absent.
+- [ ] 6. Push 1 (version still 1.0.0, so no release: v1.0.0 exists): the workflow's first CI run must be green and
+      prune a no-op. Budget 3 on CI-only failures.
+- [x] 7. Back up v1.0.0 before anything can delete it: its 10 assets + notes + tag facts into
+      `run/release-backup/v1.0.0/` (git-ignored), `sha256sum -c` against F.5's list. The local tag `v1.0.0` stays.
+      **Done:** 10 jars `sha256sum -c` against F.5's hashes: 10 OK; `notes.md` byte-identical to the published body;
+      `release.json`; `tag.txt` (annotated, object `c0f724a`, tagger wulfic, "Commitment 1.0.0").
+- [ ] 8. `version=1.0.1`, CHANGELOG 1.0.1, build + tests green; push 2. CI publishes v1.0.1 (10 assets, hashes
+      checked) and deletes v1.0.0's release and tag. Check: `gh release list`, the assets, the remote tags.
+**Not doing:** the release gate matrix (owner waived it for 1.0.1); Quilt on 1.21.11; a Quilt jar; Modrinth/CurseForge;
+changing AGENTS.md's "frozen bands' releases stay up" (it now conflicts with pruning: the owner's call).
+**Blast radius:** public: `main`, the v1.0.0 release and tag (deleted by CI on push 2: 10 jars with 1-2 downloads
+each), the new v1.0.1 release. Local: `build/` (clean, reproducible). **Rollback:** pushed commits: `git revert`. v1.0.0:
+`git push origin v1.0.0` (local annotated tag `04e661c` on `c0f724a`), then `gh release create v1.0.0 --verify-tag
+--latest=false --title "Commitment 1.0.0" --notes-file run/release-backup/v1.0.0/notes.md
+run/release-backup/v1.0.0/*.jar`. A bad v1.0.1: `gh release delete v1.0.1 --cleanup-tag` on the owner's word.
+
 ## Done
 
 _Move completed tasks here, or delete them once they're in the git history._
